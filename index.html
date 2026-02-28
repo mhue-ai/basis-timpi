@@ -409,6 +409,38 @@
       </div>
     </div>
 
+    <div class="card hidden" id="nft-card">
+      <div class="card-header">
+        <span class="card-title">Node Access NFTs</span>
+        <span style="font-size:0.72rem;color:var(--text-muted);" id="nft-count"></span>
+      </div>
+      <div id="nft-summary" class="nft-summary hidden">
+        <div class="nft-summary-item">
+          <div class="nft-summary-label">Total NFTs</div>
+          <div class="nft-summary-value" id="nft-total-count">0</div>
+        </div>
+        <div class="nft-summary-item">
+          <div class="nft-summary-label">Est. Monthly Output</div>
+          <div class="nft-summary-value yellow" id="nft-total-monthly">0 NTMPI</div>
+        </div>
+        <div class="nft-summary-item">
+          <div class="nft-summary-label">Monthly Value</div>
+          <div class="nft-summary-value" id="nft-total-monthly-usd">$0.00</div>
+        </div>
+        <div class="nft-summary-item">
+          <div class="nft-summary-label">Annual Est.</div>
+          <div class="nft-summary-value yellow" id="nft-total-annual">$0.00</div>
+        </div>
+      </div>
+      <div class="nft-grid" id="nft-grid"></div>
+      <div style="font-size:0.7rem;color:var(--text-muted);line-height:1.5;">
+        Reward amounts are <strong>guaranteed minimum pool contributions per node</strong> shared among all active nodes.
+        Actual rewards depend on node uptime and total active nodes. Data from
+        <a href="https://timpi.gitbook.io/timpis-knowledge-base/timpis-knowledge-base/timpi-nodes/node-reward-structures" target="_blank" style="color:var(--cyan);">Timpi Knowledge Base</a>.
+        Founders Edition nodes may receive a 50% bonus during their boost period.
+      </div>
+    </div>
+
     <div class="card hidden" id="transfers-card">
       <div class="card-header">
         <span class="card-title">Transaction History</span>
@@ -476,38 +508,6 @@
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
           Recalculate
         </button>
-      </div>
-    </div>
-
-    <div class="card hidden" id="nft-card">
-      <div class="card-header">
-        <span class="card-title">Node Access NFTs</span>
-        <span style="font-size:0.72rem;color:var(--text-muted);" id="nft-count"></span>
-      </div>
-      <div id="nft-summary" class="nft-summary hidden">
-        <div class="nft-summary-item">
-          <div class="nft-summary-label">Total NFTs</div>
-          <div class="nft-summary-value" id="nft-total-count">0</div>
-        </div>
-        <div class="nft-summary-item">
-          <div class="nft-summary-label">Est. Monthly Output</div>
-          <div class="nft-summary-value yellow" id="nft-total-monthly">0 NTMPI</div>
-        </div>
-        <div class="nft-summary-item">
-          <div class="nft-summary-label">Monthly Value</div>
-          <div class="nft-summary-value" id="nft-total-monthly-usd">$0.00</div>
-        </div>
-        <div class="nft-summary-item">
-          <div class="nft-summary-label">Annual Est.</div>
-          <div class="nft-summary-value yellow" id="nft-total-annual">$0.00</div>
-        </div>
-      </div>
-      <div class="nft-grid" id="nft-grid"></div>
-      <div style="font-size:0.7rem;color:var(--text-muted);line-height:1.5;">
-        Reward amounts are <strong>guaranteed minimum pool contributions per node</strong> shared among all active nodes.
-        Actual rewards depend on node uptime and total active nodes. Data from
-        <a href="https://timpi.gitbook.io/timpis-knowledge-base/timpis-knowledge-base/timpi-nodes/node-reward-structures" target="_blank" style="color:var(--cyan);">Timpi Knowledge Base</a>.
-        Founders Edition nodes may receive a 50% bonus during their boost period.
       </div>
     </div>
   </div>
