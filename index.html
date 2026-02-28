@@ -773,7 +773,7 @@
       method: 'fifo',
       activeFilters: new Set(['in', 'out', 'delegate', 'undelegate', 'redelegate', 'reward',
         'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_adjustment',
-        'staking_apy', 'lootbox']),
+        'staking_apy', 'lootbox', 'timpi_transfer', 'gift', 'drip']),
     };
 
     const $ = s => document.querySelector(s);
@@ -822,8 +822,10 @@
       const events = [];
 
       // Known Timpi payout addresses for classification
-      const TIMPI_NODE_PAYER = 'neutaro1q68nu5lwczjepjtt6v7fek8vu2m7jxnaukrpdu';
-      const TIMPI_APY_PAYER  = 'neutaro1n0uc8wwaxez3xzw8722kh2c9kuvqxtamgja4rg';
+      const TIMPI_NODE_PAYER  = 'neutaro1q68nu5lwczjepjtt6v7fek8vu2m7jxnaukrpdu';
+      const TIMPI_APY_PAYER   = 'neutaro1n0uc8wwaxez3xzw8722kh2c9kuvqxtamgja4rg';
+      const TIMPI_OPS         = 'neutaro1dq5a4x9f8ksp0y062z7v5cn3sa99tgfmjrk92x';
+      const CHARITY_VALIDATOR = 'neutaro123rsx3yhd8qts0aduw7zacpwtk6m94ucvya354';
 
       // Bank sends (as recipient and sender)
       for (const role of ['recipient', 'sender']) {
@@ -844,7 +846,7 @@
                   const sender = msg.from_address;
                   const memoLower = memo.toLowerCase();
                   if (sender === TIMPI_NODE_PAYER) {
-                    // Classify node reward sub-type from memo
+                    // Primary node reward payout wallet — classify by memo
                     if (memoLower.includes('synap')) txType = 'node_synaptron';
                     else if (memoLower.includes('guardian')) txType = 'node_guardian';
                     else if (memoLower.includes('collector')) txType = 'node_collector';
@@ -853,9 +855,21 @@
                     else if (memoLower.includes('missing') || memoLower.includes('missed')) txType = 'node_adjustment';
                     else txType = 'node_reward';
                   } else if (sender === TIMPI_APY_PAYER) {
+                    // Timpi APY / lootbox / adjustment wallet
                     if (memoLower.includes('lootbox')) txType = 'lootbox';
                     else if (memoLower.includes('adjustment') || memoLower.includes('synaptron adj')) txType = 'node_adjustment';
                     else txType = 'staking_apy';
+                  } else if (sender === TIMPI_OPS) {
+                    // Timpi operational wallet — bulk transfers, node top-ups
+                    if (memoLower.includes('synap')) txType = 'node_synaptron';
+                    else if (memoLower.includes('guardian')) txType = 'node_guardian';
+                    else if (memoLower.includes('collector')) txType = 'node_collector';
+                    else if (memoLower.includes('geo')) txType = 'node_geocore';
+                    else txType = 'timpi_transfer';
+                  } else if (sender === CHARITY_VALIDATOR) {
+                    txType = 'gift';
+                  } else if (memoLower.includes('drip') || memoLower.includes('faucet')) {
+                    txType = 'drip';
                   }
                 }
                 events.push({
@@ -1147,7 +1161,7 @@
         state.transfers = [];
         const needAPI = [];
 
-        const INFLOW_TYPES_SET = new Set(['in', 'reward', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_adjustment', 'staking_apy', 'lootbox']);
+        const INFLOW_TYPES_SET = new Set(['in', 'reward', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_adjustment', 'staking_apy', 'lootbox', 'timpi_transfer', 'gift', 'drip']);
 
         for (let idx = 0; idx < raw.length; idx++) {
           const tx = raw[idx];
@@ -1240,7 +1254,7 @@
 
     // Map filter chip data-filter to actual transaction types
     const FILTER_GROUPS = {
-      'in': ['in'],
+      'in': ['in', 'timpi_transfer', 'gift', 'drip'],
       'out': ['out'],
       'node_reward': ['node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward'],
       'staking_apy': ['staking_apy'],
@@ -1280,6 +1294,9 @@
       node_adjustment: '<span class="td-adjustment">🔧 ADJUSTMENT</span>',
       staking_apy: '<span class="td-apy">💰 STAKING APY</span>',
       lootbox: '<span class="td-lootbox">🎁 LOOTBOX</span>',
+      timpi_transfer: '<span class="td-in" style="color:var(--cyan);">⇣ TIMPI XFER</span>',
+      gift: '<span class="td-in" style="color:#f472b6;">🎉 GIFT</span>',
+      drip: '<span class="td-in" style="color:#60a5fa;">💧 DRIP</span>',
     };
 
     function renderTable() {
@@ -1301,7 +1318,7 @@
           : '—';
 
         const idx = state.transfers.indexOf(tx);
-        const isInflow = ['in', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_adjustment', 'staking_apy', 'lootbox', 'reward'].includes(tx.type);
+        const isInflow = ['in', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_adjustment', 'staking_apy', 'lootbox', 'timpi_transfer', 'gift', 'drip', 'reward'].includes(tx.type);
 
         const costCell = isInflow
           ? `<input type="number" step="0.000001" min="0"
@@ -1360,7 +1377,7 @@
 
     function recalculate() {
       // Inflows: transfers in + rewards claimed + node rewards + staking APY + lootbox
-      const INFLOW_TYPES = ['in', 'reward', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_adjustment', 'staking_apy', 'lootbox'];
+      const INFLOW_TYPES = ['in', 'reward', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_adjustment', 'staking_apy', 'lootbox', 'timpi_transfer', 'gift', 'drip'];
       const inflows = state.transfers.filter(t =>
         INFLOW_TYPES.includes(t.type) && t.costPerToken > 0
       );
@@ -1434,7 +1451,7 @@
 
     function exportCSV() {
       if (!state.transfers.length) return;
-      const INFLOW_TYPES = ['in', 'reward', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_adjustment', 'staking_apy', 'lootbox'];
+      const INFLOW_TYPES = ['in', 'reward', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_adjustment', 'staking_apy', 'lootbox', 'timpi_transfer', 'gift', 'drip'];
       const rows = [['Date','Type','Amount_NTMPI','Counterparty','Memo','Cost_Per_Token_USD','Total_Cost_USD','TxHash']];
       for (const tx of state.transfers) {
         const amt = microToDisplay(tx.amount);
@@ -1459,7 +1476,7 @@
     }
 
     function clearAll() {
-      state = { address: '', balance: 0n, staked: 0n, transfers: [], nfts: [], currentPrice: 0, method: 'fifo', activeFilters: new Set(['in','out','delegate','undelegate','redelegate','reward','node_synaptron','node_guardian','node_collector','node_geocore','node_reward','node_adjustment','staking_apy','lootbox']) };
+      state = { address: '', balance: 0n, staked: 0n, transfers: [], nfts: [], currentPrice: 0, method: 'fifo', activeFilters: new Set(['in','out','delegate','undelegate','redelegate','reward','node_synaptron','node_guardian','node_collector','node_geocore','node_reward','node_adjustment','staking_apy','lootbox','timpi_transfer','gift','drip']) };
       $('#address-input').value = '';
       $('#stats-row').classList.add('hidden');
       $('#transfers-card').classList.add('hidden');
