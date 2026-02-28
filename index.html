@@ -648,6 +648,17 @@
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export CSV
         </button>
+        <span style="display:inline-flex;align-items:center;gap:4px;">
+          <select id="tax-year" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:0.72rem;">
+            <option value="2024">TY 2024</option>
+            <option value="2025" selected>TY 2025</option>
+            <option value="2026">TY 2026</option>
+          </select>
+          <button class="btn btn-sm" style="background:var(--coral);color:#fff;border:none;" onclick="generateTaxForms()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            Generate Tax Forms
+          </button>
+        </span>
         <button class="btn btn-ghost btn-sm" onclick="recalculate()">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
           Recalculate
@@ -1519,6 +1530,339 @@
       a.href = URL.createObjectURL(blob);
       a.download = `ntmpi-cost-basis-${state.address.slice(0, 12)}.csv`;
       a.click();
+    }
+
+    /* ── IRS Tax Form Generator ──
+       Generates per-tax-year:
+       1. Form 8949 (Capital Gains/Losses) — lot-matched dispositions
+       2. Income Summary — ordinary income from rewards
+       3. Transaction Detail — full supplement
+       Opens as printable HTML window.
+    */
+
+    function generateTaxForms() {
+      if (!state.transfers.length) { alert('No transactions loaded.'); return; }
+      const year = parseInt($('#tax-year').value);
+      const yearStart = new Date(`${year}-01-01T00:00:00Z`);
+      const yearEnd = new Date(`${year + 1}-01-01T00:00:00Z`);
+
+      const INFLOW_TYPES = new Set(['in', 'reward', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_adjustment', 'staking_apy', 'lootbox', 'timpi_transfer', 'gift', 'drip']);
+      const INCOME_TYPES = new Set(['reward', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_adjustment', 'staking_apy', 'lootbox']);
+
+      // All transfers sorted chronologically
+      const sorted = [...state.transfers].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+      // ── Build cost basis lots from ALL inflows up to end of tax year ──
+      const lots = [];
+      for (const tx of sorted) {
+        if (new Date(tx.timestamp) >= yearEnd) break;
+        if (INFLOW_TYPES.has(tx.type) && tx.costPerToken > 0) {
+          lots.push({
+            date: tx.timestamp ? tx.timestamp.slice(0, 10) : '',
+            amount: Number(tx.amount) / 1e6,
+            remaining: Number(tx.amount) / 1e6,
+            cost: tx.costPerToken,
+            type: tx.type,
+            hash: tx.hash,
+          });
+        }
+      }
+
+      // Order lots per selected method
+      let orderedLots;
+      if (state.method === 'lifo') orderedLots = [...lots].reverse();
+      else if (state.method === 'hifo') orderedLots = [...lots].sort((a, b) => b.cost - a.cost);
+      else orderedLots = [...lots]; // FIFO
+
+      // ── Process dispositions BEFORE this tax year (consume lots) ──
+      for (const tx of sorted) {
+        if (new Date(tx.timestamp) >= yearStart) break;
+        if (tx.type === 'out') {
+          let rem = Number(tx.amount) / 1e6;
+          for (const l of orderedLots) {
+            if (rem <= 0) break;
+            const take = Math.min(l.remaining, rem);
+            l.remaining -= take;
+            rem -= take;
+          }
+        }
+      }
+
+      // ── Form 8949: dispositions IN this tax year ──
+      const form8949rows = [];
+      const dispositions = sorted.filter(tx => tx.type === 'out' && new Date(tx.timestamp) >= yearStart && new Date(tx.timestamp) < yearEnd);
+
+      for (const tx of dispositions) {
+        let rem = Number(tx.amount) / 1e6;
+        const saleDate = tx.timestamp ? tx.timestamp.slice(0, 10) : '';
+        // FMV on sale date
+        const salePricePerToken = lookupPrice(saleDate) || state.currentPrice;
+
+        for (const l of orderedLots) {
+          if (rem <= 0) break;
+          if (l.remaining <= 0) continue;
+          const take = Math.min(l.remaining, rem);
+          l.remaining -= take;
+          rem -= take;
+
+          const proceeds = take * salePricePerToken;
+          const basis = take * l.cost;
+          const gainLoss = proceeds - basis;
+          const acqDate = new Date(l.date);
+          const dispDate = new Date(saleDate);
+          const holdingDays = Math.floor((dispDate - acqDate) / 86400000);
+          const isLongTerm = holdingDays > 365;
+
+          form8949rows.push({
+            description: 'NTMPI (Neutaro)',
+            dateAcquired: l.date,
+            dateSold: saleDate,
+            proceeds: proceeds,
+            basis: basis,
+            adjustCode: '',
+            adjustAmount: 0,
+            gainLoss: gainLoss,
+            isLongTerm: isLongTerm,
+            qty: take,
+            hash: tx.hash,
+          });
+        }
+      }
+
+      // ── Income Summary: ordinary income IN this tax year ──
+      const incomeByType = {};
+      let totalIncome = 0, totalIncomeFMV = 0;
+      for (const tx of sorted) {
+        const d = new Date(tx.timestamp);
+        if (d < yearStart || d >= yearEnd) continue;
+        if (!INCOME_TYPES.has(tx.type)) continue;
+        const amt = Number(tx.amount) / 1e6;
+        const fmv = amt * (tx.costPerToken || 0);
+        if (!incomeByType[tx.type]) incomeByType[tx.type] = { count: 0, tokens: 0, fmv: 0 };
+        incomeByType[tx.type].count++;
+        incomeByType[tx.type].tokens += amt;
+        incomeByType[tx.type].fmv += fmv;
+        totalIncome += amt;
+        totalIncomeFMV += fmv;
+      }
+
+      // ── All year transactions for supplement ──
+      const yearTxs = sorted.filter(tx => {
+        const d = new Date(tx.timestamp);
+        return d >= yearStart && d < yearEnd;
+      });
+
+      // ── Generate printable HTML ──
+      const shortTerm = form8949rows.filter(r => !r.isLongTerm);
+      const longTerm = form8949rows.filter(r => r.isLongTerm);
+      const stTotal = shortTerm.reduce((s, r) => ({ p: s.p + r.proceeds, b: s.b + r.basis, g: s.g + r.gainLoss }), { p: 0, b: 0, g: 0 });
+      const ltTotal = longTerm.reduce((s, r) => ({ p: s.p + r.proceeds, b: s.b + r.basis, g: s.g + r.gainLoss }), { p: 0, b: 0, g: 0 });
+      const methodLabel = { fifo: 'FIFO', lifo: 'LIFO', hifo: 'HIFO', avg: 'Average Cost' }[state.method] || state.method;
+
+      const TYPE_NAMES = {
+        reward: 'On-Chain Staking Reward', node_synaptron: 'Synaptron Node Reward', node_guardian: 'Guardian Node Reward',
+        node_collector: 'Collector Node Reward', node_geocore: 'GeoCore Node Reward', node_reward: 'Node Reward (Unclassified)',
+        node_adjustment: 'Node Adjustment / Missed Reward', staking_apy: 'Timpi Staking APY', lootbox: 'Lootbox Reward',
+      };
+      const TX_TYPE_NAMES = {
+        ...TYPE_NAMES, in: 'Transfer In', out: 'Transfer Out', delegate: 'Delegate', undelegate: 'Undelegate',
+        redelegate: 'Redelegate', timpi_transfer: 'Timpi Transfer', gift: 'Gift', drip: 'Drip Faucet',
+      };
+
+      function fmtD(n) { return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' }); }
+
+      function render8949rows(rows) {
+        if (!rows.length) return '<tr><td colspan="8" style="text-align:center;color:#888;padding:12px;">No transactions</td></tr>';
+        return rows.map(r => `<tr>
+          <td>${r.description}</td>
+          <td>${r.dateAcquired}</td>
+          <td>${r.dateSold}</td>
+          <td style="text-align:right">${fmtD(r.proceeds)}</td>
+          <td style="text-align:right">${fmtD(r.basis)}</td>
+          <td>${r.adjustCode}</td>
+          <td style="text-align:right">${r.adjustAmount ? fmtD(r.adjustAmount) : ''}</td>
+          <td style="text-align:right;${r.gainLoss >= 0 ? 'color:green' : 'color:red'}">${fmtD(r.gainLoss)}</td>
+        </tr>`).join('');
+      }
+
+      function renderTotalRow(t) {
+        return `<tr style="font-weight:bold;border-top:2px solid #000;">
+          <td colspan="3">Totals</td>
+          <td style="text-align:right">${fmtD(t.p)}</td>
+          <td style="text-align:right">${fmtD(t.b)}</td>
+          <td></td><td></td>
+          <td style="text-align:right;${t.g >= 0 ? 'color:green' : 'color:red'}">${fmtD(t.g)}</td>
+        </tr>`;
+      }
+
+      const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>NTMPI Tax Forms — Tax Year ${year}</title>
+<style>
+  @media print { .no-print { display:none!important; } @page { margin: 0.5in; size: letter; } }
+  body { font-family: 'Courier New', monospace; font-size: 11px; color: #000; background: #fff; margin: 20px; line-height: 1.4; }
+  h1 { font-size: 16px; border-bottom: 2px solid #000; padding-bottom: 4px; margin-top: 30px; }
+  h2 { font-size: 13px; margin-top: 20px; border-bottom: 1px solid #666; padding-bottom: 2px; }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+  th, td { border: 1px solid #999; padding: 3px 6px; font-size: 10px; }
+  th { background: #eee; font-weight: bold; text-align: left; }
+  .header-block { border: 2px solid #000; padding: 10px; margin-bottom: 12px; }
+  .header-block strong { font-size: 14px; }
+  .section { page-break-inside: avoid; }
+  .disclaimer { font-size: 9px; color: #666; margin-top: 20px; border-top: 1px solid #ccc; padding-top: 8px; }
+  .no-print button { margin: 4px; padding: 6px 16px; font-size: 13px; cursor: pointer; }
+</style></head><body>
+
+<div class="no-print" style="text-align:center;margin-bottom:20px;padding:12px;background:#f0f0f0;border-radius:6px;">
+  <strong>NTMPI Tax Forms — Tax Year ${year}</strong><br>
+  <button onclick="window.print()">🖨️ Print / Save as PDF</button>
+  <button onclick="window.close()">Close</button>
+</div>
+
+<div class="header-block">
+  <strong>NTMPI (Neutaro) — Tax Year ${year} Summary</strong><br>
+  Wallet: ${state.address}<br>
+  Cost Basis Method: ${methodLabel}<br>
+  Generated: ${new Date().toISOString().slice(0, 10)}<br>
+  Currency: USD &nbsp;|&nbsp; Asset: NTMPI (Neutaro, uneutaro, 6 decimals)<br>
+  <span style="font-size:9px;color:#666;">This is a supplement to IRS Form 8949 / Schedule D. Not a substitute for professional tax advice.</span>
+</div>
+
+<!-- ═══════ FORM 8949 PART I: SHORT-TERM ═══════ -->
+<div class="section">
+<h1>Form 8949 — Part I: Short-Term Capital Gains and Losses (held ≤1 year)</h1>
+<p style="font-size:10px;">Check Box I — Short-term digital asset transactions not reported on Form 1099-DA (non-custodial on-chain transactions)</p>
+<table>
+  <thead><tr>
+    <th>(a) Description</th><th>(b) Date Acquired</th><th>(c) Date Sold</th>
+    <th style="text-align:right">(d) Proceeds</th><th style="text-align:right">(e) Cost Basis</th>
+    <th>(f) Code</th><th style="text-align:right">(g) Adjustment</th><th style="text-align:right">(h) Gain/Loss</th>
+  </tr></thead>
+  <tbody>
+    ${render8949rows(shortTerm)}
+    ${renderTotalRow(stTotal)}
+  </tbody>
+</table>
+<p style="font-size:9px;">→ Report totals on Schedule D, Line 1a (if Box I checked → Line 3)</p>
+</div>
+
+<!-- ═══════ FORM 8949 PART II: LONG-TERM ═══════ -->
+<div class="section">
+<h1>Form 8949 — Part II: Long-Term Capital Gains and Losses (held &gt;1 year)</h1>
+<p style="font-size:10px;">Check Box L — Long-term digital asset transactions not reported on Form 1099-DA (non-custodial on-chain transactions)</p>
+<table>
+  <thead><tr>
+    <th>(a) Description</th><th>(b) Date Acquired</th><th>(c) Date Sold</th>
+    <th style="text-align:right">(d) Proceeds</th><th style="text-align:right">(e) Cost Basis</th>
+    <th>(f) Code</th><th style="text-align:right">(g) Adjustment</th><th style="text-align:right">(h) Gain/Loss</th>
+  </tr></thead>
+  <tbody>
+    ${render8949rows(longTerm)}
+    ${renderTotalRow(ltTotal)}
+  </tbody>
+</table>
+<p style="font-size:9px;">→ Report totals on Schedule D, Line 8a (if Box L checked → Line 10)</p>
+</div>
+
+<!-- ═══════ SCHEDULE D SUMMARY ═══════ -->
+<div class="section">
+<h1>Schedule D Summary — Capital Gains and Losses</h1>
+<table>
+  <tr><th>Category</th><th style="text-align:right">Proceeds (d)</th><th style="text-align:right">Cost Basis (e)</th><th style="text-align:right">Net Gain/Loss (h)</th></tr>
+  <tr><td>Short-Term (≤1 year)</td><td style="text-align:right">${fmtD(stTotal.p)}</td><td style="text-align:right">${fmtD(stTotal.b)}</td><td style="text-align:right;${stTotal.g >= 0 ? 'color:green' : 'color:red'}">${fmtD(stTotal.g)}</td></tr>
+  <tr><td>Long-Term (>1 year)</td><td style="text-align:right">${fmtD(ltTotal.p)}</td><td style="text-align:right">${fmtD(ltTotal.b)}</td><td style="text-align:right;${ltTotal.g >= 0 ? 'color:green' : 'color:red'}">${fmtD(ltTotal.g)}</td></tr>
+  <tr style="font-weight:bold;border-top:2px solid #000;"><td>TOTAL</td><td style="text-align:right">${fmtD(stTotal.p + ltTotal.p)}</td><td style="text-align:right">${fmtD(stTotal.b + ltTotal.b)}</td><td style="text-align:right;${(stTotal.g + ltTotal.g) >= 0 ? 'color:green' : 'color:red'}">${fmtD(stTotal.g + ltTotal.g)}</td></tr>
+</table>
+</div>
+
+<!-- ═══════ ORDINARY INCOME SUMMARY ═══════ -->
+<div class="section" style="page-break-before:always;">
+<h1>Ordinary Income — Staking &amp; Node Rewards (Schedule 1 / Schedule C)</h1>
+<p style="font-size:10px;">Per IRS Rev. Rul. 2023-14: Staking and node rewards are ordinary income at fair market value when received (dominion &amp; control).</p>
+<table>
+  <thead><tr><th>Income Type</th><th style="text-align:right">Transactions</th><th style="text-align:right">NTMPI Received</th><th style="text-align:right">FMV at Receipt (USD)</th></tr></thead>
+  <tbody>
+    ${Object.entries(incomeByType).map(([type, d]) => `<tr>
+      <td>${TYPE_NAMES[type] || type}</td>
+      <td style="text-align:right">${d.count}</td>
+      <td style="text-align:right">${d.tokens.toLocaleString('en-US', {maximumFractionDigits:2})}</td>
+      <td style="text-align:right">${fmtD(d.fmv)}</td>
+    </tr>`).join('')}
+    <tr style="font-weight:bold;border-top:2px solid #000;">
+      <td>TOTAL ORDINARY INCOME</td>
+      <td style="text-align:right">${Object.values(incomeByType).reduce((s,d)=>s+d.count,0)}</td>
+      <td style="text-align:right">${totalIncome.toLocaleString('en-US', {maximumFractionDigits:2})}</td>
+      <td style="text-align:right">${fmtD(totalIncomeFMV)}</td>
+    </tr>
+  </tbody>
+</table>
+<p style="font-size:9px;">
+  Report as Other Income on Schedule 1, Line 8z, or Schedule C if treated as business activity.<br>
+  The FMV at receipt becomes the cost basis for future dispositions of these tokens.
+</p>
+</div>
+
+<!-- ═══════ FULL TRANSACTION DETAIL ═══════ -->
+<div class="section" style="page-break-before:always;">
+<h1>Transaction Detail — Supplement to Form 8949 (Tax Year ${year})</h1>
+<p style="font-size:9px;">All ${yearTxs.length} transactions for wallet ${state.address} in tax year ${year}.</p>
+<table>
+  <thead><tr><th>Date</th><th>Type</th><th>Tax Category</th><th style="text-align:right">Amount (NTMPI)</th><th>Memo</th><th style="text-align:right">FMV/Token</th><th style="text-align:right">Total FMV</th><th>Tx Hash</th></tr></thead>
+  <tbody>
+    ${yearTxs.map(tx => {
+      const amt = Number(tx.amount) / 1e6;
+      let taxCat = '';
+      if (INCOME_TYPES.has(tx.type)) taxCat = 'Ordinary Income';
+      else if (['in','timpi_transfer','gift','drip'].includes(tx.type)) taxCat = 'Acquisition';
+      else if (tx.type === 'out') taxCat = 'Disposition';
+      else if (['delegate','undelegate','redelegate'].includes(tx.type)) taxCat = 'Non-Taxable';
+      const fmv = tx.costPerToken ? fmtD(tx.costPerToken) : '—';
+      const totalFmv = (tx.costPerToken && INFLOW_TYPES.has(tx.type)) ? fmtD(amt * tx.costPerToken) : '—';
+      return `<tr>
+        <td>${(tx.timestamp||'').slice(0,10)}</td>
+        <td>${TX_TYPE_NAMES[tx.type]||tx.type}</td>
+        <td>${taxCat}</td>
+        <td style="text-align:right">${amt.toFixed(2)}</td>
+        <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${tx.memo||''}</td>
+        <td style="text-align:right">${fmv}</td>
+        <td style="text-align:right">${totalFmv}</td>
+        <td style="font-size:8px;">${tx.hash ? tx.hash.slice(0,12) + '…' : ''}</td>
+      </tr>`;
+    }).join('')}
+  </tbody>
+</table>
+</div>
+
+<!-- ═══════ DISCLAIMER ═══════ -->
+<div class="disclaimer">
+  <strong>Disclaimer:</strong> This report is generated by Basis Timpi (basis.clawpurse.ai) for informational purposes only.
+  It is not tax, legal, or financial advice. Cryptocurrency is treated as property by the IRS (Notice 2014-21).
+  Staking and node rewards are ordinary income at FMV when received (Rev. Rul. 2023-14).
+  Cost basis tracked per-wallet per Rev. Proc. 2024-28. Cost basis method used: ${methodLabel}.
+  On-chain NTMPI transactions are not reported by brokers on Form 1099-DA — taxpayer is responsible for self-reporting.
+  Always consult a qualified tax professional. Generated ${new Date().toISOString()}.
+</div>
+
+</body></html>`;
+
+      // Open in new window
+      const win = window.open('', '_blank');
+      win.document.write(html);
+      win.document.close();
+    }
+
+    /* ── Price lookup helper for tax forms ── */
+    function lookupPrice(dateStr) {
+      if (!dateStr || !window.NTMPI_DAILY_PRICES) return 0;
+      // Try exact date
+      if (NTMPI_DAILY_PRICES[dateStr]) return NTMPI_DAILY_PRICES[dateStr];
+      // Try nearby dates (±3 days)
+      const d = new Date(dateStr);
+      for (let i = 1; i <= 3; i++) {
+        const prev = new Date(d); prev.setDate(prev.getDate() - i);
+        const key = prev.toISOString().slice(0, 10);
+        if (NTMPI_DAILY_PRICES[key]) return NTMPI_DAILY_PRICES[key];
+      }
+      return 0;
     }
 
     function clearAll() {
