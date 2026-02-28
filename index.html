@@ -996,10 +996,9 @@
     document.addEventListener('DOMContentLoaded', () => renderAddressBook());
 
     /* Auto-detect self-owned wallets by analyzing round-trip transfer patterns.
-       An address is flagged as likely self-owned if:
-       1. This wallet sent tokens TO it AND received tokens FROM it, OR
-       2. Incoming memos contain self-transfer keywords (Test Out, Closing out, Seed)
-       User is prompted to confirm before tagging. */
+       An address is flagged as likely self-owned if this wallet both sent TO it
+       AND received FROM it (any inflow type). Users can manually tag additional
+       addresses via the Address Book UI. */
     function autoDetectSelfWallets() {
       const book = getAddressBook();
       const outAddrs = new Set();
@@ -1008,7 +1007,11 @@
         const cp = (tx.counterparty || '').toLowerCase();
         if (!cp || cp === state.address.toLowerCase()) continue;
         if (tx.type === 'out') outAddrs.add(cp);
-        if (tx.type === 'in' || tx._originalType === 'in') inAddrs.add(cp);
+        // Any inbound transfer (regardless of classified type) counts for round-trip detection
+        const origType = tx._originalType || tx.type;
+        if (origType !== 'out' && origType !== 'delegate' && origType !== 'undelegate' && origType !== 'redelegate' && origType !== 'reward') {
+          inAddrs.add(cp);
+        }
       }
       // Round-trip addresses: sent to AND received from — strong self-wallet signal
       const candidates = [...outAddrs].filter(a => inAddrs.has(a))
