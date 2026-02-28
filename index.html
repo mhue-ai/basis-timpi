@@ -936,6 +936,55 @@
     // Initialize address book on load
     document.addEventListener('DOMContentLoaded', () => renderAddressBook());
 
+    /* Auto-detect self-owned wallets by analyzing round-trip transfer patterns.
+       An address is flagged as likely self-owned if:
+       1. This wallet sent tokens TO it AND received tokens FROM it, OR
+       2. Incoming memos contain self-transfer keywords (Test Out, Closing out, Seed)
+       User is prompted to confirm before tagging. */
+    function autoDetectSelfWallets() {
+      const book = getAddressBook();
+      const outAddrs = new Set();
+      const inAddrs = new Set();
+      const inMemos = {};
+      for (const tx of state.transfers) {
+        const cp = (tx.counterparty || '').toLowerCase();
+        if (!cp || cp === state.address.toLowerCase()) continue;
+        if (tx.type === 'out') outAddrs.add(cp);
+        if (tx.type === 'in' || tx._originalType === 'in') {
+          inAddrs.add(cp);
+          if (!inMemos[cp]) inMemos[cp] = [];
+          if (tx.memo) inMemos[cp].push(tx.memo);
+        }
+      }
+      // Round-trip addresses: sent to AND received from
+      const roundTrip = [...outAddrs].filter(a => inAddrs.has(a));
+      // Self-transfer keyword addresses
+      const SELF_KEYWORDS = ['test out', 'closing out', 'seed'];
+      const keywordMatches = [...inAddrs].filter(a => {
+        const memos = inMemos[a] || [];
+        return memos.some(m => SELF_KEYWORDS.some(kw => m.toLowerCase().includes(kw)));
+      });
+      // Combine and deduplicate, excluding already-tagged addresses and known Timpi addresses
+      const KNOWN_TIMPI = new Set([
+        'neutaro1q68nu5lwczjepjtt6v7fek8vu2m7jxnaukrpdu',
+        'neutaro1n0uc8wwaxez3xzw8722kh2c9kuvqxtamgja4rg',
+        'neutaro1dq5a4x9f8ksp0y062z7v5cn3sa99tgfmjrk92x',
+        'neutaro123rsx3yhd8qts0aduw7zacpwtk6m94ucvya354',
+      ]);
+      const candidates = [...new Set([...roundTrip, ...keywordMatches])]
+        .filter(a => !book[a] && !KNOWN_TIMPI.has(a));
+      
+      if (candidates.length === 0) return;
+      
+      // Auto-tag and notify user
+      for (const addr of candidates) {
+        book[addr] = 'self';
+      }
+      saveAddressBook(book);
+      const n = candidates.length;
+      showStatus(`Auto-detected ${n} self-owned wallet${n > 1 ? 's' : ''} (round-trip transfers). Tagged as "Self" in Address Book.`, 'success');
+    }
+
     /* ── UI helpers ── */
 
     function showStatus(msg, type = 'info') {
@@ -1011,7 +1060,7 @@
                     else if (memoLower.includes('geo')) txType = 'node_geocore';
                     else if (memoLower.includes('apy') || memoLower.includes('apr')) txType = 'staking_apy';
                     else if (memoLower.includes('missing') || memoLower.includes('missed')) txType = 'node_adjustment';
-                    else txType = 'node_reward';
+                    else txType = 'node_unclassified';
                   } else if (sender === TIMPI_APY_PAYER) {
                     // Timpi APY / lootbox / adjustment wallet
                     if (memoLower.includes('lootbox')) txType = 'lootbox';
@@ -1363,8 +1412,12 @@
           }
         }
 
+        // Auto-detect self-owned wallets: addresses where this wallet both sent TO and received FROM
+        autoDetectSelfWallets();
+
         // Apply address book tags before rendering
         reclassifyTransfers();
+        renderAddressBook();
         showStats();
         renderTable();
         recalculate();
@@ -1804,8 +1857,8 @@
 
       const TYPE_NAMES = {
         reward: 'On-Chain Staking Reward', node_synaptron: 'Synaptron Node Reward', node_guardian: 'Guardian Node Reward',
-        node_collector: 'Collector Node Reward', node_geocore: 'GeoCore Node Reward', node_reward: 'Node Reward (Unclassified)',
-        node_unclassified: 'Unclassified Rewards',
+        node_collector: 'Collector Node Reward', node_geocore: 'GeoCore Node Reward',
+        node_unclassified: 'Unclassified Rewards', node_reward: 'Unclassified Rewards',
         node_adjustment: 'Node Adjustment / Missed Reward', staking_apy: 'Timpi Staking APY', lootbox: 'Lootbox Reward',
       };
       const TX_TYPE_NAMES = {
