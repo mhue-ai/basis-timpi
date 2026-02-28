@@ -184,6 +184,11 @@
     .td-out { color: var(--red); }
     .td-stake { color: var(--purple); }
     .td-reward { color: var(--yellow); }
+    .td-node { color: var(--cyan); }
+    .td-apy { color: #a78bfa; }
+    .td-lootbox { color: #f472b6; }
+    .td-adjustment { color: #fb923c; }
+    .td-memo { color: var(--text-dim); font-size: 0.7rem; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .td-hash a { color: var(--cyan); text-decoration: none; font-size: 0.75rem; }
     .td-hash a:hover { text-decoration: underline; }
 
@@ -585,6 +590,12 @@
         <div class="toggle-chip active" data-filter="out" onclick="toggleFilter(this)">
           <span class="chip-dot red"></span> Transfers Out
         </div>
+        <div class="toggle-chip active" data-filter="node_reward" onclick="toggleFilter(this)">
+          <span class="chip-dot" style="background:var(--cyan);"></span> Node Rewards
+        </div>
+        <div class="toggle-chip active" data-filter="staking_apy" onclick="toggleFilter(this)">
+          <span class="chip-dot" style="background:#a78bfa;"></span> Staking APY
+        </div>
         <div class="toggle-chip active" data-filter="delegate" onclick="toggleFilter(this)">
           <span class="chip-dot purple"></span> Delegate
         </div>
@@ -595,7 +606,10 @@
           <span class="chip-dot purple"></span> Redelegate
         </div>
         <div class="toggle-chip active" data-filter="reward" onclick="toggleFilter(this)">
-          <span class="chip-dot yellow"></span> Rewards
+          <span class="chip-dot yellow"></span> Staking Claims
+        </div>
+        <div class="toggle-chip active" data-filter="other_reward" onclick="toggleFilter(this)">
+          <span class="chip-dot" style="background:#f472b6;"></span> Lootbox / Adj
         </div>
       </div>
 
@@ -616,6 +630,7 @@
               <th>Type</th>
               <th>Amount (NTMPI)</th>
               <th>Counterparty</th>
+              <th>Memo</th>
               <th>Cost/NTMPI ($)</th>
               <th>Total Cost ($)</th>
               <th>Tx</th>
@@ -756,7 +771,9 @@
       nfts: [],
       currentPrice: 0,
       method: 'fifo',
-      activeFilters: new Set(['in', 'out', 'delegate', 'undelegate', 'redelegate', 'reward']),
+      activeFilters: new Set(['in', 'out', 'delegate', 'undelegate', 'redelegate', 'reward',
+        'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_adjustment',
+        'staking_apy', 'lootbox']),
     };
 
     const $ = s => document.querySelector(s);
@@ -804,6 +821,10 @@
     async function fetchAllTransactions(address) {
       const events = [];
 
+      // Known Timpi payout addresses for classification
+      const TIMPI_NODE_PAYER = 'neutaro1q68nu5lwczjepjtt6v7fek8vu2m7jxnaukrpdu';
+      const TIMPI_APY_PAYER  = 'neutaro1n0uc8wwaxez3xzw8722kh2c9kuvqxtamgja4rg';
+
       // Bank sends (as recipient and sender)
       for (const role of ['recipient', 'sender']) {
         const txs = await fetchTxByEvent(`transfer.${role}`, address);
@@ -816,11 +837,33 @@
               const match = (role === 'sender' && msg.from_address === address) ||
                             (role === 'recipient' && msg.to_address === address);
               if (match) {
+                // Classify incoming transfers by sender address + memo
+                let txType = dir;
+                let memo = tx.memo || '';
+                if (dir === 'in') {
+                  const sender = msg.from_address;
+                  const memoLower = memo.toLowerCase();
+                  if (sender === TIMPI_NODE_PAYER) {
+                    // Classify node reward sub-type from memo
+                    if (memoLower.includes('synap')) txType = 'node_synaptron';
+                    else if (memoLower.includes('guardian')) txType = 'node_guardian';
+                    else if (memoLower.includes('collector')) txType = 'node_collector';
+                    else if (memoLower.includes('geo')) txType = 'node_geocore';
+                    else if (memoLower.includes('apy') || memoLower.includes('apr')) txType = 'staking_apy';
+                    else if (memoLower.includes('missing') || memoLower.includes('missed')) txType = 'node_adjustment';
+                    else txType = 'node_reward';
+                  } else if (sender === TIMPI_APY_PAYER) {
+                    if (memoLower.includes('lootbox')) txType = 'lootbox';
+                    else if (memoLower.includes('adjustment') || memoLower.includes('synaptron adj')) txType = 'node_adjustment';
+                    else txType = 'staking_apy';
+                  }
+                }
                 events.push({
                   hash: tx.hash, height: tx.height, timestamp: tx.timestamp,
-                  type: dir,
+                  type: txType,
                   amount: BigInt(coin.amount),
                   counterparty: role === 'sender' ? msg.to_address : msg.from_address,
+                  memo,
                 });
               }
             }
@@ -840,6 +883,7 @@
                 type: 'delegate',
                 amount: BigInt(coin.amount),
                 counterparty: msg.validator_address || '',
+                memo: tx.memo || '',
               });
             }
           }
@@ -858,6 +902,7 @@
                 type: 'undelegate',
                 amount: BigInt(coin.amount),
                 counterparty: msg.validator_address || '',
+                memo: tx.memo || '',
               });
             }
           }
@@ -876,6 +921,7 @@
                 type: 'redelegate',
                 amount: BigInt(coin.amount),
                 counterparty: `${truncAddr(msg.validator_src_address)} → ${truncAddr(msg.validator_dst_address)}`,
+                memo: tx.memo || '',
               });
             }
           }
@@ -894,6 +940,7 @@
             type: 'reward',
             amount: rewardAmount,
             counterparty: 'Staking Reward',
+            memo: tx.memo || '',
           });
         }
       }
@@ -944,6 +991,7 @@
         for (let i = 0; i < responses.length; i++) {
           const txRes = responses[i];
           const msgs = data.txs?.[i]?.body?.messages || [];
+          const memo = data.txs?.[i]?.body?.memo || '';
           // Also capture events from tx_response for reward parsing
           const evts = txRes.events || txRes.logs?.[0]?.events || [];
           txs.push({
@@ -951,6 +999,7 @@
             height: parseInt(txRes.height),
             timestamp: txRes.timestamp || '',
             msgs,
+            memo,
             events: evts,
           });
         }
@@ -1098,11 +1147,13 @@
         state.transfers = [];
         const needAPI = [];
 
+        const INFLOW_TYPES_SET = new Set(['in', 'reward', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_adjustment', 'staking_apy', 'lootbox']);
+
         for (let idx = 0; idx < raw.length; idx++) {
           const tx = raw[idx];
           let autoPrice = 0;
-          // Cost basis applies to: incoming transfers and reward claims
-          const needsPrice = (tx.type === 'in' || tx.type === 'reward');
+          // Cost basis applies to all inflow types
+          const needsPrice = INFLOW_TYPES_SET.has(tx.type);
           if (needsPrice) {
             autoPrice = lookupHistoricalPrice(tx.timestamp);
           }
@@ -1110,9 +1161,10 @@
             hash: tx.hash,
             height: tx.height,
             timestamp: tx.timestamp,
-            type: tx.type,       // 'in' | 'out' | 'delegate' | 'undelegate' | 'redelegate' | 'reward'
+            type: tx.type,
             amount: tx.amount,
             counterparty: tx.counterparty,
+            memo: tx.memo || '',
             costPerToken: autoPrice,
             autoPrice,
           });
@@ -1186,13 +1238,27 @@
 
     /* ── Filter toggles ── */
 
+    // Map filter chip data-filter to actual transaction types
+    const FILTER_GROUPS = {
+      'in': ['in'],
+      'out': ['out'],
+      'node_reward': ['node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward'],
+      'staking_apy': ['staking_apy'],
+      'delegate': ['delegate'],
+      'undelegate': ['undelegate'],
+      'redelegate': ['redelegate'],
+      'reward': ['reward'],
+      'other_reward': ['lootbox', 'node_adjustment'],
+    };
+
     function toggleFilter(chip) {
       const filter = chip.dataset.filter;
+      const types = FILTER_GROUPS[filter] || [filter];
       chip.classList.toggle('active');
-      if (state.activeFilters.has(filter)) {
-        state.activeFilters.delete(filter);
-      } else {
-        state.activeFilters.add(filter);
+      const isActive = chip.classList.contains('active');
+      for (const t of types) {
+        if (isActive) state.activeFilters.add(t);
+        else state.activeFilters.delete(t);
       }
       renderTable();
     }
@@ -1206,6 +1272,14 @@
       undelegate: '<span class="td-stake">⬇ UNDELEGATE</span>',
       redelegate: '<span class="td-stake">↔ REDELEGATE</span>',
       reward: '<span class="td-reward">★ REWARD</span>',
+      node_synaptron: '<span class="td-node">⚡ NODE: SYNAPTRON</span>',
+      node_guardian: '<span class="td-node">🛡️ NODE: GUARDIAN</span>',
+      node_collector: '<span class="td-node">🔍 NODE: COLLECTOR</span>',
+      node_geocore: '<span class="td-node">🌐 NODE: GEOCORE</span>',
+      node_reward: '<span class="td-node">📦 NODE REWARD</span>',
+      node_adjustment: '<span class="td-adjustment">🔧 ADJUSTMENT</span>',
+      staking_apy: '<span class="td-apy">💰 STAKING APY</span>',
+      lootbox: '<span class="td-lootbox">🎁 LOOTBOX</span>',
     };
 
     function renderTable() {
@@ -1216,7 +1290,7 @@
       if (sortDir === 'desc') list = [...list].reverse();
 
       if (!list.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px;">No transactions found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:32px;">No transactions found</td></tr>';
         return;
       }
 
@@ -1227,26 +1301,28 @@
           : '—';
 
         const idx = state.transfers.indexOf(tx);
-        const needsPrice = (tx.type === 'in' || tx.type === 'reward');
+        const isInflow = ['in', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_adjustment', 'staking_apy', 'lootbox', 'reward'].includes(tx.type);
 
-        const costCell = needsPrice
+        const costCell = isInflow
           ? `<input type="number" step="0.000001" min="0"
               class="cost-input ${tx.autoPrice > 0 ? 'auto-filled' : ''}"
               value="${tx.costPerToken ? tx.costPerToken.toFixed(6) : ''}"
               placeholder="0.000000" data-idx="${idx}" onchange="updateCost(this)" />`
           : '<span style="color:var(--text-muted)">—</span>';
 
-        const totalCost = (needsPrice && tx.costPerToken > 0)
+        const totalCost = (isInflow && tx.costPerToken > 0)
           ? fmtUSD(amt * tx.costPerToken)
           : '<span style="color:var(--text-muted)">—</span>';
 
         const counterparty = tx.counterparty || '—';
+        const memo = tx.memo || '';
 
         return `<tr>
           <td>${dateStr}</td>
           <td>${TYPE_LABELS[tx.type] || tx.type}</td>
           <td style="font-weight:500">${fmt(amt, 2)}</td>
           <td class="td-addr" title="${counterparty}">${truncAddr(counterparty)}</td>
+          <td class="td-memo" title="${memo}">${memo || '—'}</td>
           <td>${costCell}</td>
           <td>${totalCost}</td>
           <td class="td-hash"><a href="${NEUTARO.explorer}/${tx.hash}" target="_blank">${tx.hash.slice(0,8)}…</a></td>
@@ -1283,9 +1359,10 @@
     */
 
     function recalculate() {
-      // Inflows: transfers in + rewards claimed
+      // Inflows: transfers in + rewards claimed + node rewards + staking APY + lootbox
+      const INFLOW_TYPES = ['in', 'reward', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_adjustment', 'staking_apy', 'lootbox'];
       const inflows = state.transfers.filter(t =>
-        (t.type === 'in' || t.type === 'reward') && t.costPerToken > 0
+        INFLOW_TYPES.includes(t.type) && t.costPerToken > 0
       );
       // Outflows: only bank sends out
       const outflows = state.transfers.filter(t => t.type === 'out');
@@ -1357,17 +1434,20 @@
 
     function exportCSV() {
       if (!state.transfers.length) return;
-      const rows = [['Date','Type','Amount_NTMPI','Counterparty','Cost_Per_Token_USD','Total_Cost_USD','TxHash']];
+      const INFLOW_TYPES = ['in', 'reward', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_adjustment', 'staking_apy', 'lootbox'];
+      const rows = [['Date','Type','Amount_NTMPI','Counterparty','Memo','Cost_Per_Token_USD','Total_Cost_USD','TxHash']];
       for (const tx of state.transfers) {
         const amt = microToDisplay(tx.amount);
-        const needsPrice = (tx.type === 'in' || tx.type === 'reward');
+        const isInflow = INFLOW_TYPES.includes(tx.type);
+        const memo = (tx.memo || '').replace(/"/g, '""');
         rows.push([
           tx.timestamp || '',
           tx.type.toUpperCase(),
           amt.toFixed(6),
           tx.counterparty,
-          (needsPrice && tx.costPerToken) ? tx.costPerToken.toFixed(6) : '',
-          (needsPrice && tx.costPerToken > 0) ? (amt * tx.costPerToken).toFixed(2) : '',
+          `"${memo}"`,
+          (isInflow && tx.costPerToken) ? tx.costPerToken.toFixed(6) : '',
+          (isInflow && tx.costPerToken > 0) ? (amt * tx.costPerToken).toFixed(2) : '',
           tx.hash,
         ]);
       }
@@ -1379,7 +1459,7 @@
     }
 
     function clearAll() {
-      state = { address: '', balance: 0n, staked: 0n, transfers: [], nfts: [], currentPrice: 0, method: 'fifo', activeFilters: new Set(['in','out','delegate','undelegate','redelegate','reward']) };
+      state = { address: '', balance: 0n, staked: 0n, transfers: [], nfts: [], currentPrice: 0, method: 'fifo', activeFilters: new Set(['in','out','delegate','undelegate','redelegate','reward','node_synaptron','node_guardian','node_collector','node_geocore','node_reward','node_adjustment','staking_apy','lootbox']) };
       $('#address-input').value = '';
       $('#stats-row').classList.add('hidden');
       $('#transfers-card').classList.add('hidden');
