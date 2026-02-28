@@ -10,7 +10,7 @@
 ## Features
 
 ### Cost Basis Tracking
-- **Three accounting methods** — FIFO, LIFO, and Average Cost with instant switching
+- **Four IRS-compliant cost basis methods** — FIFO (IRS default), LIFO, HIFO (tax-optimized), and Average Cost with instant switching
 - **Bundled historical prices** — 703+ daily NTMPI/USD prices from 2024-03-28 onward (no API calls for lookups)
 - **Manual override** — Edit the per-token cost on any transaction row
 - **Real-time stats** — Available balance, staked balance, cost basis, current value, unrealized P&L
@@ -61,7 +61,7 @@
    - CW721 NFT ownership (`/cosmwasm/wasm/v1/contract/.../smart/`)
 3. Each incoming transfer is matched against bundled `prices.js` for that date's NTMPI/USD price
 4. Transactions are classified by sender address and memo content (see below)
-5. Select your accounting method (FIFO, LIFO, or Average Cost)
+5. Select your cost basis method (FIFO, LIFO, HIFO, or Average Cost)
 6. View cost basis, current value, and unrealized gain/loss
 
 ---
@@ -264,6 +264,49 @@ User enters address
        ▼
   Dashboard + CSV Export
 ```
+
+---
+
+## IRS Tax Compliance
+
+This tool implements current IRS guidance for cryptocurrency tax reporting:
+
+### Applicable Rules
+
+| Rule | Reference | Implementation |
+|------|-----------|---------------|
+| Crypto treated as property | Notice 2014-21 | All acquisitions and dispositions tracked with FMV |
+| Staking rewards = ordinary income at FMV | Rev. Rul. 2023-14 | Node rewards, staking APY, lootbox rewards classified as ordinary income |
+| Per-wallet cost basis tracking | Rev. Proc. 2024-28 | Single-wallet tracker (compliant by design) |
+| FIFO is default if no election | IRS guidance | FIFO is the default method; LIFO, HIFO, Avg Cost available |
+| Delegate/undelegate not taxable | Current guidance | Staking operations do not create or dispose cost basis lots |
+
+### Tax Categories in CSV Export
+
+The CSV export includes a `Tax_Category` column that classifies each transaction:
+
+| Category | Transaction Types | Tax Treatment |
+|----------|-------------------|---------------|
+| **Ordinary Income** | Node rewards, staking APY, lootbox, on-chain staking rewards, adjustments | Taxed at ordinary income rates (10-37%) at FMV when received |
+| **Acquisition** | Transfers in, Timpi transfers, gifts, drip | Creates cost basis lot at FMV on date received |
+| **Disposition** | Transfers out | May trigger capital gain/loss (short-term ≤1yr or long-term >1yr) |
+| **Non-Taxable** | Delegate, undelegate, redelegate | No taxable event; tokens remain owned |
+
+### Cost Basis Methods
+
+| Method | Description | Use Case |
+|--------|-------------|----------|
+| **FIFO** | First-In-First-Out | IRS default. Sells oldest lots first. |
+| **LIFO** | Last-In-First-Out | Sells newest lots first. |
+| **HIFO** | Highest-In-First-Out | Sells highest-cost lots first. Often minimizes taxable gains. |
+| **Avg Cost** | Weighted average of all lots | Simplest calculation but may not be optimal. |
+
+### Important Notes
+
+- **Form 1099-DA**: Starting 2025, brokers report gross proceeds to IRS. Cost basis reporting begins 2026 for covered assets. On-chain transactions (like Neutaro) are not broker-facilitated and must be self-reported.
+- **Form 8949 / Schedule D**: Capital gains and losses from crypto dispositions are reported here.
+- **Ordinary Income**: Staking and node rewards are reported as Other Income (Schedule 1) or Schedule C if treated as a business activity.
+- This tool is for informational purposes only. Consult a qualified tax professional.
 
 ---
 
