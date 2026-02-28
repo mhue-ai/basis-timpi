@@ -4,12 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Basis Timpi — NTMPI Cost Basis Calculator</title>
-  <meta name="description" content="Calculate the USD cost basis for your NTMPI holdings on the Neutaro blockchain. Tracks incoming transfers, auto-fetches historical prices, and computes unrealized gains." />
+  <meta name="description" content="Calculate the USD cost basis for your NTMPI holdings on the Neutaro blockchain. Tracks transfers, staking delegations, rewards, and computes unrealized gains." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
     :root {
       --bg: #0c0e13;
       --bg-raised: #12151c;
@@ -31,11 +32,15 @@
       --red: #f4587a;
       --red-dim: rgba(244,88,122,0.10);
       --yellow: #f4c542;
+      --yellow-dim: rgba(244,197,66,0.10);
+      --purple: #a78bfa;
+      --purple-dim: rgba(167,139,250,0.10);
       --font: 'Outfit', system-ui, sans-serif;
       --mono: 'Fira Code', 'JetBrains Mono', monospace;
       --radius: 10px;
       --radius-sm: 6px;
     }
+
     html { scroll-behavior: smooth; }
     body {
       font-family: var(--font);
@@ -48,10 +53,10 @@
     body::before {
       content: '';
       position: fixed; inset: 0; z-index: 9999;
-      pointer-events: none;
-      opacity: 0.025;
+      pointer-events: none; opacity: 0.025;
       background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     }
+
     .topnav {
       position: sticky; top: 0; z-index: 100;
       background: rgba(12,14,19,0.88);
@@ -80,7 +85,9 @@
       background: var(--coral-dim); color: var(--coral);
       padding: 2px 8px; border-radius: 20px; font-weight: 500;
     }
+
     .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+
     .hero {
       padding: 48px 0 32px; text-align: center; position: relative;
     }
@@ -94,17 +101,20 @@
     .hero h1 { font-size: 1.8rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; }
     .hero h1 span { color: var(--coral); }
     .hero p { color: var(--text-dim); font-size: 0.95rem; max-width: 560px; margin: 0 auto; }
+
     .card {
       background: var(--bg-card); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 24px; margin-bottom: 20px;
     }
     .card-header {
-      display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
     }
     .card-title {
       font-size: 0.85rem; font-weight: 600; color: var(--text-dim);
       text-transform: uppercase; letter-spacing: 0.06em;
     }
+
     .input-row { display: flex; gap: 12px; margin-bottom: 12px; }
     .input-group { flex: 1; }
     .input-group label {
@@ -112,12 +122,15 @@
       margin-bottom: 6px; font-weight: 500;
     }
     .input-group input, .input-group select {
-      width: 100%; background: var(--bg-input); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); padding: 10px 14px; color: var(--text);
-      font-family: var(--mono); font-size: 0.85rem; outline: none; transition: border-color 0.2s;
+      width: 100%; background: var(--bg-input);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 10px 14px; color: var(--text);
+      font-family: var(--mono); font-size: 0.85rem;
+      outline: none; transition: border-color 0.2s;
     }
     .input-group input:focus { border-color: var(--coral); }
     .input-group input::placeholder { color: var(--text-muted); }
+
     .btn {
       display: inline-flex; align-items: center; gap: 8px;
       padding: 10px 20px; border: none; border-radius: var(--radius-sm);
@@ -130,8 +143,9 @@
     .btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
     .btn-ghost:hover { border-color: var(--coral); color: var(--coral); }
     .btn-sm { padding: 6px 12px; font-size: 0.78rem; }
+
     .stats {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
       gap: 12px; margin-bottom: 20px;
     }
     .stat-card {
@@ -146,13 +160,18 @@
     .stat-sub { font-size: 0.75rem; color: var(--text-dim); margin-top: 2px; font-family: var(--mono); }
     .stat-value.gain { color: var(--green); }
     .stat-value.loss { color: var(--red); }
-    .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+    .stat-value.staked { color: var(--purple); }
+
+    .table-wrap {
+      overflow-x: auto; border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
     table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
     thead th {
-      background: var(--bg-raised); color: var(--text-muted); font-weight: 600;
-      font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em;
-      padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border);
-      position: sticky; top: 0;
+      background: var(--bg-raised); color: var(--text-muted);
+      font-weight: 600; font-size: 0.72rem; text-transform: uppercase;
+      letter-spacing: 0.06em; padding: 10px 14px; text-align: left;
+      border-bottom: 1px solid var(--border); position: sticky; top: 0;
     }
     tbody td {
       padding: 10px 14px; border-bottom: 1px solid var(--border);
@@ -163,15 +182,21 @@
     .td-addr { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .td-in { color: var(--green); }
     .td-out { color: var(--red); }
+    .td-stake { color: var(--purple); }
+    .td-reward { color: var(--yellow); }
     .td-hash a { color: var(--cyan); text-decoration: none; font-size: 0.75rem; }
     .td-hash a:hover { text-decoration: underline; }
+
     .cost-input {
-      width: 90px; background: var(--bg-input); border: 1px solid var(--border);
-      border-radius: 4px; padding: 4px 8px; color: var(--text);
-      font-family: var(--mono); font-size: 0.78rem; outline: none; transition: border-color 0.2s;
+      width: 90px; background: var(--bg-input);
+      border: 1px solid var(--border); border-radius: 4px;
+      padding: 4px 8px; color: var(--text);
+      font-family: var(--mono); font-size: 0.78rem;
+      outline: none; transition: border-color 0.2s;
     }
     .cost-input:focus { border-color: var(--coral); }
     .cost-input.auto-filled { border-color: var(--cyan); background: var(--cyan-dim); }
+
     .price-badge {
       display: inline-flex; align-items: center; gap: 4px;
       font-family: var(--mono); font-size: 0.8rem;
@@ -181,18 +206,22 @@
       background: var(--green); animation: pulse 2s infinite;
     }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
     .status-bar {
       display: flex; align-items: center; gap: 8px;
-      padding: 10px 16px; background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--text-dim); margin-bottom: 16px;
+      padding: 10px 16px; background: var(--bg-card);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      font-size: 0.8rem; color: var(--text-dim); margin-bottom: 16px;
     }
     .status-bar .spinner {
-      width: 14px; height: 14px; border: 2px solid var(--border);
-      border-top-color: var(--coral); border-radius: 50%; animation: spin 0.8s linear infinite;
+      width: 14px; height: 14px;
+      border: 2px solid var(--border); border-top-color: var(--coral);
+      border-radius: 50%; animation: spin 0.8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
     .status-bar.error { border-color: rgba(244,88,122,0.3); background: var(--red-dim); color: var(--red); }
     .status-bar.success { border-color: rgba(61,214,140,0.3); background: var(--green-dim); color: var(--green); }
+
     .method-bar {
       display: flex; gap: 2px; margin-bottom: 16px;
       background: var(--bg-input); border-radius: var(--radius-sm);
@@ -201,528 +230,812 @@
     .method-btn {
       flex: 1; padding: 8px 12px; background: transparent; border: none;
       color: var(--text-dim); font-family: var(--font);
-      font-size: 0.78rem; font-weight: 600; border-radius: 4px; cursor: pointer; transition: all 0.2s;
+      font-size: 0.78rem; font-weight: 600; border-radius: 4px;
+      cursor: pointer; transition: all 0.2s;
     }
     .method-btn.active { background: var(--coral); color: #0c0e13; }
     .method-btn:not(.active):hover { color: var(--text); }
+
     .export-bar { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+    .toggle-row {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .toggle-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 20px; font-size: 0.75rem;
+      font-weight: 600; cursor: pointer; transition: all 0.2s;
+      border: 1px solid var(--border); background: var(--bg-input);
+      color: var(--text-dim); user-select: none;
+    }
+    .toggle-chip.active { border-color: var(--coral); color: var(--coral); background: var(--coral-dim); }
+    .toggle-chip .chip-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+    }
+    .chip-dot.green { background: var(--green); }
+    .chip-dot.red { background: var(--red); }
+    .chip-dot.purple { background: var(--purple); }
+    .chip-dot.yellow { background: var(--yellow); }
+
     footer {
-      border-top: 1px solid var(--border); padding: 24px 0; margin-top: 40px;
-      text-align: center; color: var(--text-muted); font-size: 0.78rem;
+      border-top: 1px solid var(--border); padding: 24px 0;
+      margin-top: 40px; text-align: center;
+      color: var(--text-muted); font-size: 0.78rem;
     }
     footer a { color: var(--coral); text-decoration: none; }
     footer a:hover { text-decoration: underline; }
     .hidden { display: none !important; }
+
     @media (max-width: 640px) {
       .input-row { flex-direction: column; }
       .stats { grid-template-columns: 1fr 1fr; }
       .hero h1 { font-size: 1.4rem; }
       table { font-size: 0.75rem; }
       thead th, tbody td { padding: 8px 10px; }
+      .toggle-row { gap: 6px; }
     }
   </style>
 </head>
 <body>
-
-<nav class="topnav">
-  <div class="topnav-inner">
-    <div class="topnav-logo">
-      <span class="basis">Basis</span><span class="timpi">Timpi</span>
-      <span class="topnav-badge">Neutaro</span>
-    </div>
-    <div class="topnav-links">
-      <a href="https://explorer.neutaro.io/Neutaro" target="_blank">Explorer</a>
-      <a href="https://github.com/mhue-ai/ClawPurse" target="_blank">ClawPurse</a>
-      <a href="https://github.com/mhue-ai/basis-timpi" target="_blank">GitHub</a>
-    </div>
-  </div>
-</nav>
-
-<div class="container">
-  <section class="hero">
-    <h1>NTMPI <span>Cost Basis</span> Calculator</h1>
-    <p>Track your Neutaro chain transfers and calculate USD cost basis with auto-fetched or manual pricing.</p>
-  </section>
-
-  <div class="card" id="wallet-card">
-    <div class="card-header">
-      <span class="card-title">Wallet Address</span>
-      <div class="price-badge" id="live-price" style="display:none">
-        <span class="dot"></span>
-        <span id="price-display">$0.0000</span>
+  <nav class="topnav">
+    <div class="topnav-inner">
+      <div class="topnav-logo">
+        <span class="basis">Basis</span><span class="timpi">Timpi</span>
+        <span class="topnav-badge">Neutaro</span>
+      </div>
+      <div class="topnav-links">
+        <a href="https://explorer.neutaro.io/Neutaro" target="_blank">Explorer</a>
+        <a href="https://github.com/mhue-ai/ClawPurse" target="_blank">ClawPurse</a>
+        <a href="https://github.com/mhue-ai/basis-timpi" target="_blank">GitHub</a>
       </div>
     </div>
-    <div class="input-row">
-      <div class="input-group" style="flex:3">
-        <label>Neutaro Address</label>
-        <input type="text" id="address-input" placeholder="neutaro1..." spellcheck="false" autocomplete="off" />
-      </div>
-    </div>
-    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-      <button class="btn btn-primary" id="fetch-btn" onclick="fetchWallet()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
-        Fetch Transactions
-      </button>
-      <button class="btn btn-ghost btn-sm" onclick="clearAll()">Clear</button>
-      <span style="font-size:0.75rem; color:var(--text-muted); margin-left:auto;">
-        Uses Neutaro REST API — no API key needed
-      </span>
-    </div>
-  </div>
+  </nav>
 
-  <div id="status-container" class="hidden"></div>
-
-  <div class="stats hidden" id="stats-row">
-    <div class="stat-card">
-      <div class="stat-label">Balance</div>
-      <div class="stat-value" id="stat-balance">—</div>
-      <div class="stat-sub" id="stat-balance-usd">—</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Cost Basis</div>
-      <div class="stat-value" id="stat-basis">—</div>
-      <div class="stat-sub" id="stat-avg-cost">—</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Current Value</div>
-      <div class="stat-value" id="stat-value">—</div>
-      <div class="stat-sub" id="stat-price">—</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Unrealized P&amp;L</div>
-      <div class="stat-value" id="stat-pnl">—</div>
-      <div class="stat-sub" id="stat-pnl-pct">—</div>
-    </div>
-  </div>
-
-  <div class="card hidden" id="transfers-card">
-    <div class="card-header">
-      <span class="card-title">Transfer History</span>
-      <div style="display:flex;gap:6px;align-items:center;">
-        <span style="font-size:0.72rem;color:var(--text-muted);">Show:</span>
-        <select id="filter-direction" style="font-size:0.75rem;padding:4px 8px;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font);" onchange="renderTable()">
-          <option value="all">All</option>
-          <option value="in">Incoming Only</option>
-          <option value="out">Outgoing Only</option>
-        </select>
-      </div>
-    </div>
-
-    <div style="margin-bottom:12px;">
-      <span style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:600;">Cost Basis Method</span>
-    </div>
-    <div class="method-bar">
-      <button class="method-btn active" data-method="fifo" onclick="setMethod('fifo')">FIFO</button>
-      <button class="method-btn" data-method="lifo" onclick="setMethod('lifo')">LIFO</button>
-      <button class="method-btn" data-method="avg" onclick="setMethod('avg')">Avg Cost</button>
-    </div>
-
-    <div class="table-wrap" id="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Direction</th>
-            <th>Amount (NTMPI)</th>
-            <th>Counterparty</th>
-            <th>Cost/NTMPI ($)</th>
-            <th>Total Cost ($)</th>
-            <th>Tx</th>
-          </tr>
-        </thead>
-        <tbody id="tx-tbody"></tbody>
-      </table>
-    </div>
-    <div class="export-bar">
-      <button class="btn btn-ghost btn-sm" onclick="exportCSV()">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Export CSV
-      </button>
-      <button class="btn btn-ghost btn-sm" onclick="recalculate()">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-        Recalculate
-      </button>
-    </div>
-  </div>
-</div>
-
-<footer>
   <div class="container">
-    <p>
-      <strong>Basis Timpi</strong> — Open-source NTMPI cost basis tracker on the
-      <a href="https://neutaro.com" target="_blank">Neutaro</a> blockchain.
-      Part of the <a href="https://github.com/mhue-ai/ClawPurse" target="_blank">ClawPurse</a> ecosystem.
-    </p>
-    <p style="margin-top:6px;">
-      Live price via <a href="https://www.coingecko.com/en/coins/neutaro" target="_blank">CoinGecko</a>.
-      Historical prices from bundled <code>prices.js</code> with CoinGecko API fallback for newer dates.
-      Not financial advice.
-    </p>
+    <section class="hero">
+      <h1>NTMPI <span>Cost Basis</span> Calculator</h1>
+      <p>Track your Neutaro chain transfers, staking delegations, and rewards — calculate USD cost basis with auto-fetched or manual pricing.</p>
+    </section>
+
+    <div class="card" id="wallet-card">
+      <div class="card-header">
+        <span class="card-title">Wallet Address</span>
+        <div class="price-badge" id="live-price" style="display:none">
+          <span class="dot"></span>
+          <span id="price-display">$0.0000</span>
+        </div>
+      </div>
+      <div class="input-row">
+        <div class="input-group" style="flex:3">
+          <label>Neutaro Address</label>
+          <input type="text" id="address-input" placeholder="neutaro1..." spellcheck="false" autocomplete="off" />
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <button class="btn btn-primary" id="fetch-btn" onclick="fetchWallet()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
+          Fetch Transactions
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="clearAll()">Clear</button>
+        <span style="font-size:0.75rem; color:var(--text-muted); margin-left:auto;">
+          Uses Neutaro REST API — no API key needed
+        </span>
+      </div>
+    </div>
+
+    <div id="status-container" class="hidden"></div>
+
+    <div class="stats hidden" id="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Available Balance</div>
+        <div class="stat-value" id="stat-balance">—</div>
+        <div class="stat-sub" id="stat-balance-usd">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Staked</div>
+        <div class="stat-value staked" id="stat-staked">—</div>
+        <div class="stat-sub" id="stat-staked-usd">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Cost Basis</div>
+        <div class="stat-value" id="stat-basis">—</div>
+        <div class="stat-sub" id="stat-avg-cost">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Value</div>
+        <div class="stat-value" id="stat-value">—</div>
+        <div class="stat-sub" id="stat-price">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Rewards Earned</div>
+        <div class="stat-value" id="stat-rewards">—</div>
+        <div class="stat-sub" id="stat-rewards-sub">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Unrealized P&amp;L</div>
+        <div class="stat-value" id="stat-pnl">—</div>
+        <div class="stat-sub" id="stat-pnl-pct">—</div>
+      </div>
+    </div>
+
+    <div class="card hidden" id="transfers-card">
+      <div class="card-header">
+        <span class="card-title">Transaction History</span>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span style="font-size:0.72rem;color:var(--text-muted);">Sort:</span>
+          <select id="sort-order" style="font-size:0.75rem;padding:4px 8px;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font);" onchange="renderTable()">
+            <option value="asc">Oldest First</option>
+            <option value="desc">Newest First</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="toggle-row" id="filter-toggles">
+        <div class="toggle-chip active" data-filter="in" onclick="toggleFilter(this)">
+          <span class="chip-dot green"></span> Transfers In
+        </div>
+        <div class="toggle-chip active" data-filter="out" onclick="toggleFilter(this)">
+          <span class="chip-dot red"></span> Transfers Out
+        </div>
+        <div class="toggle-chip active" data-filter="delegate" onclick="toggleFilter(this)">
+          <span class="chip-dot purple"></span> Delegate
+        </div>
+        <div class="toggle-chip active" data-filter="undelegate" onclick="toggleFilter(this)">
+          <span class="chip-dot purple"></span> Undelegate
+        </div>
+        <div class="toggle-chip active" data-filter="redelegate" onclick="toggleFilter(this)">
+          <span class="chip-dot purple"></span> Redelegate
+        </div>
+        <div class="toggle-chip active" data-filter="reward" onclick="toggleFilter(this)">
+          <span class="chip-dot yellow"></span> Rewards
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <span style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:600;">Cost Basis Method</span>
+      </div>
+      <div class="method-bar">
+        <button class="method-btn active" data-method="fifo" onclick="setMethod('fifo')">FIFO</button>
+        <button class="method-btn" data-method="lifo" onclick="setMethod('lifo')">LIFO</button>
+        <button class="method-btn" data-method="avg" onclick="setMethod('avg')">Avg Cost</button>
+      </div>
+
+      <div class="table-wrap" id="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Amount (NTMPI)</th>
+              <th>Counterparty</th>
+              <th>Cost/NTMPI ($)</th>
+              <th>Total Cost ($)</th>
+              <th>Tx</th>
+            </tr>
+          </thead>
+          <tbody id="tx-tbody"></tbody>
+        </table>
+      </div>
+      <div class="export-bar">
+        <button class="btn btn-ghost btn-sm" onclick="exportCSV()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export CSV
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="recalculate()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+          Recalculate
+        </button>
+      </div>
+    </div>
   </div>
-</footer>
 
-<script src="prices.js"></script>
-<script>
-const NEUTARO = {
-  rest: 'https://api2.neutaro.io',
-  denom: 'uneutaro',
-  decimals: 6,
-  prefix: 'neutaro',
-  explorer: 'https://explorer.neutaro.io/Neutaro/tx',
-  coingeckoId: 'neutaro',
-};
+  <footer>
+    <div class="container">
+      <p>
+        <strong>Basis Timpi</strong> — Open-source NTMPI cost basis tracker on the
+        <a href="https://neutaro.com" target="_blank">Neutaro</a> blockchain.
+        Part of the <a href="https://github.com/mhue-ai/ClawPurse" target="_blank">ClawPurse</a> ecosystem.
+      </p>
+      <p style="margin-top:6px;">
+        Live price via <a href="https://www.coingecko.com/en/coins/neutaro" target="_blank">CoinGecko</a>.
+        Historical prices from bundled <code>prices.js</code> with CoinGecko API fallback for newer dates.
+        Not financial advice.
+      </p>
+    </div>
+  </footer>
 
-let state = {
-  address: '',
-  balance: 0n,
-  transfers: [],
-  currentPrice: 0,
-  method: 'fifo',
-};
+  <script src="prices.js"></script>
+  <script>
+    const NEUTARO = {
+      rest: 'https://api2.neutaro.io',
+      denom: 'uneutaro',
+      decimals: 6,
+      prefix: 'neutaro',
+      explorer: 'https://explorer.neutaro.io/Neutaro/tx',
+      coingeckoId: 'neutaro',
+    };
 
-const $ = s => document.querySelector(s);
-const $$ = s => document.querySelectorAll(s);
+    let state = {
+      address: '',
+      balance: 0n,
+      staked: 0n,
+      transfers: [],       // unified list: bank sends, delegations, undelegations, redelegations, rewards
+      currentPrice: 0,
+      method: 'fifo',
+      activeFilters: new Set(['in', 'out', 'delegate', 'undelegate', 'redelegate', 'reward']),
+    };
 
-function showStatus(msg, type = 'info') {
-  const c = $('#status-container');
-  c.classList.remove('hidden');
-  c.innerHTML = `<div class="status-bar ${type === 'error' ? 'error' : type === 'success' ? 'success' : ''}">
-    ${type === 'info' ? '<div class="spinner"></div>' : ''}<span>${msg}</span></div>`;
-}
-function hideStatus() { $('#status-container').classList.add('hidden'); }
-function fmt(n, dec = 6) { return Number(n).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }); }
-function fmtUSD(n) { return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-function microToDisplay(micro) { return Number(micro) / (10 ** NEUTARO.decimals); }
-function truncAddr(a) { return (!a || a.length < 16) ? a : a.slice(0, 12) + '…' + a.slice(-6); }
+    const $ = s => document.querySelector(s);
+    const $$ = s => document.querySelectorAll(s);
 
-// --- Neutaro REST API ---
-async function fetchBalance(address) {
-  const res = await fetch(`${NEUTARO.rest}/cosmos/bank/v1beta1/balances/${address}`);
-  if (!res.ok) throw new Error(`Balance fetch failed: ${res.status}`);
-  const data = await res.json();
-  const coin = (data.balances || []).find(b => b.denom === NEUTARO.denom);
-  return BigInt(coin?.amount || '0');
-}
+    /* ── UI helpers ── */
 
-async function fetchTransfers(address) {
-  const transfers = [];
-  for (const role of ['recipient', 'sender']) {
-    const txs = await fetchTxEvents(address, role);
-    const dir = role === 'recipient' ? 'in' : 'out';
-    for (const tx of txs) transfers.push({ ...tx, direction: dir });
-  }
-  const seen = new Set();
-  return transfers.filter(t => {
-    const k = `${t.hash}-${t.direction}`;
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  }).sort((a, b) => a.height - b.height);
-}
+    function showStatus(msg, type = 'info') {
+      const c = $('#status-container');
+      c.classList.remove('hidden');
+      c.innerHTML = `<div class="status-bar ${type === 'error' ? 'error' : type === 'success' ? 'success' : ''}">
+        ${type === 'info' ? '<div class="spinner"></div>' : ''}<span>${msg}</span></div>`;
+    }
+    function hideStatus() { $('#status-container').classList.add('hidden'); }
+    function fmt(n, dec = 6) { return Number(n).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }); }
+    function fmtUSD(n) { return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+    function microToDisplay(micro) { return Number(micro) / (10 ** NEUTARO.decimals); }
+    function truncAddr(a) { return (!a || a.length < 16) ? a : a.slice(0, 12) + '…' + a.slice(-6); }
 
-async function fetchTxEvents(address, role) {
-  const eventKey = `transfer.${role}`;
-  const txs = [];
-  let page = 1;
-  do {
-    let url = `${NEUTARO.rest}/cosmos/tx/v1beta1/txs?events=${encodeURIComponent(`${eventKey}='${address}'`)}&pagination.limit=100&page=${page}&order_by=2`;
-    const res = await fetch(url);
-    if (!res.ok) break;
-    const data = await res.json();
-    const total = parseInt(data.total || '0');
-    const responses = data.tx_responses || [];
-    for (let i = 0; i < responses.length; i++) {
-      const txRes = responses[i];
-      const msgs = data.txs?.[i]?.body?.messages || [];
-      for (const msg of msgs) {
-        if (msg['@type'] !== '/cosmos.bank.v1beta1.MsgSend') continue;
-        const coin = (msg.amount || []).find(a => a.denom === NEUTARO.denom);
-        if (!coin) continue;
-        const match = (role === 'sender' && msg.from_address === address) ||
-                      (role === 'recipient' && msg.to_address === address);
-        if (match) {
+    /* ── Neutaro REST API — Balance & Staking ── */
+
+    async function fetchBalance(address) {
+      const res = await fetch(`${NEUTARO.rest}/cosmos/bank/v1beta1/balances/${address}`);
+      if (!res.ok) throw new Error(`Balance fetch failed: ${res.status}`);
+      const data = await res.json();
+      const coin = (data.balances || []).find(b => b.denom === NEUTARO.denom);
+      return BigInt(coin?.amount || '0');
+    }
+
+    async function fetchDelegations(address) {
+      try {
+        const res = await fetch(`${NEUTARO.rest}/cosmos/staking/v1beta1/delegations/${address}`);
+        if (!res.ok) return 0n;
+        const data = await res.json();
+        let total = 0n;
+        for (const d of (data.delegation_responses || [])) {
+          total += BigInt(d.balance?.amount || '0');
+        }
+        return total;
+      } catch { return 0n; }
+    }
+
+    /* ── Neutaro REST API — Transaction fetching ── */
+
+    async function fetchAllTransactions(address) {
+      const events = [];
+
+      // Bank sends (as recipient and sender)
+      for (const role of ['recipient', 'sender']) {
+        const txs = await fetchTxByEvent(`transfer.${role}`, address);
+        const dir = role === 'recipient' ? 'in' : 'out';
+        for (const tx of txs) {
+          for (const msg of tx.msgs) {
+            if (msg['@type'] === '/cosmos.bank.v1beta1.MsgSend') {
+              const coin = (msg.amount || []).find(a => a.denom === NEUTARO.denom);
+              if (!coin) continue;
+              const match = (role === 'sender' && msg.from_address === address) ||
+                            (role === 'recipient' && msg.to_address === address);
+              if (match) {
+                events.push({
+                  hash: tx.hash, height: tx.height, timestamp: tx.timestamp,
+                  type: dir,
+                  amount: BigInt(coin.amount),
+                  counterparty: role === 'sender' ? msg.to_address : msg.from_address,
+                });
+              }
+            }
+          }
+        }
+      }
+
+      // Delegations
+      const delegateTxs = await fetchTxByEvent('message.action', '/cosmos.staking.v1beta1.MsgDelegate', address);
+      for (const tx of delegateTxs) {
+        for (const msg of tx.msgs) {
+          if (msg['@type'] === '/cosmos.staking.v1beta1.MsgDelegate' && msg.delegator_address === address) {
+            const coin = msg.amount;
+            if (coin && coin.denom === NEUTARO.denom) {
+              events.push({
+                hash: tx.hash, height: tx.height, timestamp: tx.timestamp,
+                type: 'delegate',
+                amount: BigInt(coin.amount),
+                counterparty: msg.validator_address || '',
+              });
+            }
+          }
+        }
+      }
+
+      // Undelegations
+      const undelegateTxs = await fetchTxByEvent('message.action', '/cosmos.staking.v1beta1.MsgUndelegate', address);
+      for (const tx of undelegateTxs) {
+        for (const msg of tx.msgs) {
+          if (msg['@type'] === '/cosmos.staking.v1beta1.MsgUndelegate' && msg.delegator_address === address) {
+            const coin = msg.amount;
+            if (coin && coin.denom === NEUTARO.denom) {
+              events.push({
+                hash: tx.hash, height: tx.height, timestamp: tx.timestamp,
+                type: 'undelegate',
+                amount: BigInt(coin.amount),
+                counterparty: msg.validator_address || '',
+              });
+            }
+          }
+        }
+      }
+
+      // Redelegations
+      const redelegateTxs = await fetchTxByEvent('message.action', '/cosmos.staking.v1beta1.MsgBeginRedelegate', address);
+      for (const tx of redelegateTxs) {
+        for (const msg of tx.msgs) {
+          if (msg['@type'] === '/cosmos.staking.v1beta1.MsgBeginRedelegate' && msg.delegator_address === address) {
+            const coin = msg.amount;
+            if (coin && coin.denom === NEUTARO.denom) {
+              events.push({
+                hash: tx.hash, height: tx.height, timestamp: tx.timestamp,
+                type: 'redelegate',
+                amount: BigInt(coin.amount),
+                counterparty: `${truncAddr(msg.validator_src_address)} → ${truncAddr(msg.validator_dst_address)}`,
+              });
+            }
+          }
+        }
+      }
+
+      // Reward withdrawals
+      const rewardTxs = await fetchTxByEvent('message.action', '/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward', address);
+      for (const tx of rewardTxs) {
+        // Rewards show up in tx events, not in the message body amount
+        // Parse from events: withdraw_rewards.amount
+        const rewardAmount = parseRewardFromEvents(tx.events, address);
+        if (rewardAmount > 0n) {
+          events.push({
+            hash: tx.hash, height: tx.height, timestamp: tx.timestamp,
+            type: 'reward',
+            amount: rewardAmount,
+            counterparty: 'Staking Reward',
+          });
+        }
+      }
+
+      // Deduplicate by hash+type
+      const seen = new Set();
+      return events.filter(e => {
+        const k = `${e.hash}-${e.type}-${e.amount}`;
+        if (seen.has(k)) return false;
+        seen.add(k); return true;
+      }).sort((a, b) => a.height - b.height);
+    }
+
+    function parseRewardFromEvents(events, address) {
+      // Look for withdraw_rewards events to get reward amount
+      if (!events) return 0n;
+      let total = 0n;
+      for (const ev of events) {
+        if (ev.type === 'withdraw_rewards' || ev.type === 'transfer') {
+          for (const attr of (ev.attributes || [])) {
+            if (attr.key === 'amount' && attr.value) {
+              // Parse "12345uneutaro" or "12345uneutaro,678uother"
+              const match = attr.value.match(/(\d+)uneutaro/);
+              if (match) total += BigInt(match[1]);
+            }
+          }
+        }
+      }
+      return total;
+    }
+
+    async function fetchTxByEvent(eventKey, eventValue, filterAddress) {
+      const txs = [];
+      let page = 1;
+      do {
+        let url;
+        if (filterAddress) {
+          // For message.action events, also filter by sender
+          url = `${NEUTARO.rest}/cosmos/tx/v1beta1/txs?events=${encodeURIComponent(`${eventKey}='${eventValue}'`)}&events=${encodeURIComponent(`message.sender='${filterAddress}'`)}&pagination.limit=100&page=${page}&order_by=2`;
+        } else {
+          url = `${NEUTARO.rest}/cosmos/tx/v1beta1/txs?events=${encodeURIComponent(`${eventKey}='${eventValue}'`)}&pagination.limit=100&page=${page}&order_by=2`;
+        }
+        const res = await fetch(url);
+        if (!res.ok) break;
+        const data = await res.json();
+        const total = parseInt(data.total || '0');
+        const responses = data.tx_responses || [];
+        for (let i = 0; i < responses.length; i++) {
+          const txRes = responses[i];
+          const msgs = data.txs?.[i]?.body?.messages || [];
+          // Also capture events from tx_response for reward parsing
+          const evts = txRes.events || txRes.logs?.[0]?.events || [];
           txs.push({
             hash: txRes.txhash,
             height: parseInt(txRes.height),
             timestamp: txRes.timestamp || '',
-            amount: BigInt(coin.amount),
-            counterparty: role === 'sender' ? msg.to_address : msg.from_address,
+            msgs,
+            events: evts,
           });
         }
-      }
-    }
-    if (page > 1) showStatus(`Fetching ${role} transfers… (page ${page})`, 'info');
-    if (responses.length < 100 || page * 100 >= total) break;
-    page++;
-  } while (page <= 20);
-  return txs;
-}
-
-// --- Price Data ---
-// Static historical prices loaded from prices.js (window.NTMPI_PRICES)
-// Falls back to CoinGecko API for dates not in the static file
-// Current price fetched live from CoinGecko
-
-async function fetchCurrentPrice() {
-  try {
-    const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${NEUTARO.coingeckoId}&vs_currencies=usd`);
-    const data = await res.json();
-    return data[NEUTARO.coingeckoId]?.usd || 0;
-  } catch { return 0; }
-}
-
-function lookupHistoricalPrice(isoTimestamp) {
-  // Look up price from static prices.js data (instant, no API call)
-  if (!isoTimestamp) return 0;
-  if (!window.NTMPI_PRICES) return 0;
-  const d = new Date(isoTimestamp);
-  const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
-  return window.NTMPI_PRICES[key] || 0;
-}
-
-function isoToCGDate(iso) {
-  if (!iso) return null;
-  const d = new Date(iso);
-  return `${String(d.getUTCDate()).padStart(2,'0')}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${d.getUTCFullYear()}`;
-}
-
-const _cgCache = {};
-async function fetchHistoricalPriceAPI(cgDate) {
-  if (_cgCache[cgDate] !== undefined) return _cgCache[cgDate];
-  try {
-    const res = await fetch(`https://api.coingecko.com/api/v3/coins/${NEUTARO.coingeckoId}/history?date=${cgDate}`);
-    if (!res.ok) { _cgCache[cgDate] = 0; return 0; }
-    const data = await res.json();
-    const price = data.market_data?.current_price?.usd || 0;
-    _cgCache[cgDate] = price;
-    return price;
-  } catch { _cgCache[cgDate] = 0; return 0; }
-}
-
-// --- Main fetch ---
-async function fetchWallet() {
-  const addr = $('#address-input').value.trim();
-  if (!addr.startsWith('neutaro1') || addr.length < 40) {
-    showStatus('Enter a valid Neutaro address (starts with neutaro1)', 'error');
-    return;
-  }
-  state.address = addr;
-  $('#fetch-btn').disabled = true;
-  try {
-    showStatus('Fetching current NTMPI price…', 'info');
-    state.currentPrice = await fetchCurrentPrice();
-    if (state.currentPrice > 0) {
-      $('#live-price').style.display = 'flex';
-      $('#price-display').textContent = `$${state.currentPrice.toFixed(6)}`;
+        if (page > 1) showStatus(`Fetching transactions… (page ${page})`, 'info');
+        if (responses.length < 100 || page * 100 >= total) break;
+        page++;
+      } while (page <= 20);
+      return txs;
     }
 
-    showStatus('Fetching wallet balance…', 'info');
-    state.balance = await fetchBalance(addr);
+    /* ── Price Data ── */
 
-    showStatus('Fetching transfer history…', 'info');
-    const raw = await fetchTransfers(addr);
-
-    showStatus(`Found ${raw.length} transfers. Looking up historical prices…`, 'info');
-    state.transfers = [];
-    const needAPI = [];
-    for (let idx = 0; idx < raw.length; idx++) {
-      const tx = raw[idx];
-      let autoPrice = 0;
-      if (tx.direction === 'in') {
-        autoPrice = lookupHistoricalPrice(tx.timestamp);
-      }
-      state.transfers.push({
-        hash: tx.hash, height: tx.height, timestamp: tx.timestamp,
-        direction: tx.direction, amount: tx.amount, counterparty: tx.counterparty,
-        costPerToken: autoPrice, autoPrice,
-      });
-      if (tx.direction === 'in' && autoPrice === 0 && tx.timestamp) {
-        needAPI.push(idx);
-      }
+    async function fetchCurrentPrice() {
+      try {
+        const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${NEUTARO.coingeckoId}&vs_currencies=usd`);
+        const data = await res.json();
+        return data[NEUTARO.coingeckoId]?.usd || 0;
+      } catch { return 0; }
     }
 
-    // Fall back to CoinGecko API for dates not in prices.js
-    if (needAPI.length > 0) {
-      showStatus(`${needAPI.length} transfer(s) not in price file — fetching from CoinGecko…`, 'info');
-      let apiCalls = 0;
-      for (const idx of needAPI) {
-        const t = state.transfers[idx];
-        const cgDate = isoToCGDate(t.timestamp);
-        if (!cgDate) continue;
-        if (apiCalls > 0 && apiCalls % 8 === 0) {
-          showStatus(`Fetching prices… (${apiCalls}/${needAPI.length}, rate-limit pause)`, 'info');
-          await new Promise(r => setTimeout(r, 2200));
+    function lookupHistoricalPrice(isoTimestamp) {
+      if (!isoTimestamp || !window.NTMPI_PRICES) return 0;
+      const d = new Date(isoTimestamp);
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+      return window.NTMPI_PRICES[key] || 0;
+    }
+
+    function isoToCGDate(iso) {
+      if (!iso) return null;
+      const d = new Date(iso);
+      return `${String(d.getUTCDate()).padStart(2,'0')}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${d.getUTCFullYear()}`;
+    }
+
+    const _cgCache = {};
+    async function fetchHistoricalPriceAPI(cgDate) {
+      if (_cgCache[cgDate] !== undefined) return _cgCache[cgDate];
+      try {
+        const res = await fetch(`https://api.coingecko.com/api/v3/coins/${NEUTARO.coingeckoId}/history?date=${cgDate}`);
+        if (!res.ok) { _cgCache[cgDate] = 0; return 0; }
+        const data = await res.json();
+        const price = data.market_data?.current_price?.usd || 0;
+        _cgCache[cgDate] = price;
+        return price;
+      } catch { _cgCache[cgDate] = 0; return 0; }
+    }
+
+    /* ── Main fetch ── */
+
+    async function fetchWallet() {
+      const addr = $('#address-input').value.trim();
+      if (!addr.startsWith('neutaro1') || addr.length < 40) {
+        showStatus('Enter a valid Neutaro address (starts with neutaro1)', 'error');
+        return;
+      }
+      state.address = addr;
+      $('#fetch-btn').disabled = true;
+      try {
+        showStatus('Fetching current NTMPI price…', 'info');
+        state.currentPrice = await fetchCurrentPrice();
+        if (state.currentPrice > 0) {
+          $('#live-price').style.display = 'flex';
+          $('#price-display').textContent = `$${state.currentPrice.toFixed(6)}`;
         }
-        const price = await fetchHistoricalPriceAPI(cgDate);
-        if (price > 0) {
-          t.costPerToken = price;
-          t.autoPrice = price;
+
+        showStatus('Fetching wallet balance…', 'info');
+        state.balance = await fetchBalance(addr);
+
+        showStatus('Fetching staking delegations…', 'info');
+        state.staked = await fetchDelegations(addr);
+
+        showStatus('Fetching all transactions (transfers, staking, rewards)…', 'info');
+        const raw = await fetchAllTransactions(addr);
+
+        showStatus(`Found ${raw.length} transactions. Looking up historical prices…`, 'info');
+
+        state.transfers = [];
+        const needAPI = [];
+
+        for (let idx = 0; idx < raw.length; idx++) {
+          const tx = raw[idx];
+          let autoPrice = 0;
+          // Cost basis applies to: incoming transfers and reward claims
+          const needsPrice = (tx.type === 'in' || tx.type === 'reward');
+          if (needsPrice) {
+            autoPrice = lookupHistoricalPrice(tx.timestamp);
+          }
+          state.transfers.push({
+            hash: tx.hash,
+            height: tx.height,
+            timestamp: tx.timestamp,
+            type: tx.type,       // 'in' | 'out' | 'delegate' | 'undelegate' | 'redelegate' | 'reward'
+            amount: tx.amount,
+            counterparty: tx.counterparty,
+            costPerToken: autoPrice,
+            autoPrice,
+          });
+          if (needsPrice && autoPrice === 0 && tx.timestamp) {
+            needAPI.push(idx);
+          }
         }
-        apiCalls++;
+
+        // Fallback to CoinGecko for missing prices
+        if (needAPI.length > 0) {
+          showStatus(`${needAPI.length} transaction(s) not in price file — fetching from CoinGecko…`, 'info');
+          let apiCalls = 0;
+          for (const idx of needAPI) {
+            const t = state.transfers[idx];
+            const cgDate = isoToCGDate(t.timestamp);
+            if (!cgDate) continue;
+            if (apiCalls > 0 && apiCalls % 8 === 0) {
+              showStatus(`Fetching prices… (${apiCalls}/${needAPI.length}, rate-limit pause)`, 'info');
+              await new Promise(r => setTimeout(r, 2200));
+            }
+            const price = await fetchHistoricalPriceAPI(cgDate);
+            if (price > 0) { t.costPerToken = price; t.autoPrice = price; }
+            apiCalls++;
+          }
+        }
+
+        showStats();
+        renderTable();
+        recalculate();
+        $('#stats-row').classList.remove('hidden');
+        $('#transfers-card').classList.remove('hidden');
+        showStatus(`Loaded ${state.transfers.length} transactions for ${truncAddr(addr)}`, 'success');
+        setTimeout(hideStatus, 3000);
+      } catch (err) {
+        showStatus(`Error: ${err.message}`, 'error');
+      } finally {
+        $('#fetch-btn').disabled = false;
       }
     }
 
-    showStats();
-    renderTable();
-    recalculate();
-    $('#stats-row').classList.remove('hidden');
-    $('#transfers-card').classList.remove('hidden');
-    showStatus(`Loaded ${state.transfers.length} transfers for ${truncAddr(addr)}`, 'success');
-    setTimeout(hideStatus, 3000);
-  } catch (err) {
-    showStatus(`Error: ${err.message}`, 'error');
-  } finally {
-    $('#fetch-btn').disabled = false;
-  }
-}
+    /* ── Stats display ── */
 
-function showStats() {
-  const bal = microToDisplay(state.balance);
-  const val = bal * state.currentPrice;
-  $('#stat-balance').textContent = fmt(bal, 2) + ' NTMPI';
-  $('#stat-balance-usd').textContent = fmtUSD(val);
-  $('#stat-value').textContent = fmtUSD(val);
-  $('#stat-price').textContent = `@ $${state.currentPrice.toFixed(6)}/NTMPI`;
-}
+    function showStats() {
+      const bal = microToDisplay(state.balance);
+      const stk = microToDisplay(state.staked);
+      const totalTokens = bal + stk;
+      const totalVal = totalTokens * state.currentPrice;
 
-function renderTable() {
-  const tbody = $('#tx-tbody');
-  const filter = $('#filter-direction').value;
-  const list = state.transfers.filter(t => filter === 'all' || t.direction === (filter === 'in' ? 'in' : 'out'));
-  if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px;">No transfers found</td></tr>';
-    return;
-  }
-  tbody.innerHTML = list.map(tx => {
-    const amt = microToDisplay(tx.amount);
-    const dateStr = tx.timestamp ? new Date(tx.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
-    const dir = tx.direction === 'in' ? '<span class="td-in">▼ IN</span>' : '<span class="td-out">▲ OUT</span>';
-    const idx = state.transfers.indexOf(tx);
-    const costCell = tx.direction === 'in'
-      ? `<input type="number" step="0.000001" min="0" class="cost-input ${tx.autoPrice > 0 ? 'auto-filled' : ''}"
-           value="${tx.costPerToken ? tx.costPerToken.toFixed(6) : ''}" placeholder="0.000000"
-           data-idx="${idx}" onchange="updateCost(this)" />`
-      : '<span style="color:var(--text-muted)">—</span>';
-    const totalCost = (tx.direction === 'in' && tx.costPerToken > 0) ? fmtUSD(amt * tx.costPerToken) : '<span style="color:var(--text-muted)">—</span>';
-    return `<tr>
-      <td>${dateStr}</td><td>${dir}</td>
-      <td style="font-weight:500">${fmt(amt, 2)}</td>
-      <td class="td-addr" title="${tx.counterparty}">${truncAddr(tx.counterparty)}</td>
-      <td>${costCell}</td><td>${totalCost}</td>
-      <td class="td-hash"><a href="${NEUTARO.explorer}/${tx.hash}" target="_blank">${tx.hash.slice(0,8)}…</a></td>
-    </tr>`;
-  }).join('');
-}
+      $('#stat-balance').textContent = fmt(bal, 2) + ' NTMPI';
+      $('#stat-balance-usd').textContent = fmtUSD(bal * state.currentPrice);
 
-function updateCost(input) {
-  const idx = parseInt(input.dataset.idx);
-  state.transfers[idx].costPerToken = parseFloat(input.value) || 0;
-  input.classList.remove('auto-filled');
-  recalculate();
-  renderTable();
-}
+      $('#stat-staked').textContent = fmt(stk, 2) + ' NTMPI';
+      $('#stat-staked-usd').textContent = fmtUSD(stk * state.currentPrice);
 
-function setMethod(m) {
-  state.method = m;
-  $$('.method-btn').forEach(b => b.classList.toggle('active', b.dataset.method === m));
-  recalculate();
-}
+      $('#stat-value').textContent = fmtUSD(totalVal);
+      $('#stat-price').textContent = `@ $${state.currentPrice.toFixed(6)}/NTMPI`;
 
-function recalculate() {
-  const inflows = state.transfers.filter(t => t.direction === 'in' && t.costPerToken > 0);
-  const outflows = state.transfers.filter(t => t.direction === 'out');
-  if (!inflows.length) {
-    $('#stat-basis').textContent = '—';
-    $('#stat-avg-cost').textContent = 'Enter cost per token';
-    $('#stat-pnl').textContent = '—'; $('#stat-pnl').className = 'stat-value';
-    $('#stat-pnl-pct').textContent = '—';
-    return;
-  }
-  let totalCost = 0, totalTokens = 0;
-  const lots = inflows.map(t => ({ amount: microToDisplay(t.amount), cost: t.costPerToken, remaining: microToDisplay(t.amount) }));
-  for (const l of lots) { totalCost += l.amount * l.cost; totalTokens += l.amount; }
-
-  if (state.method === 'fifo' || state.method === 'lifo') {
-    const ordered = state.method === 'lifo' ? [...lots].reverse() : lots;
-    let disposed = 0, disposedCost = 0;
-    for (const out of outflows) {
-      let rem = microToDisplay(out.amount);
-      for (const l of ordered) {
-        if (rem <= 0) break;
-        const take = Math.min(l.remaining, rem);
-        disposedCost += take * l.cost;
-        l.remaining -= take;
-        rem -= take;
-        disposed += take;
-      }
+      // Rewards total
+      const rewardTxs = state.transfers.filter(t => t.type === 'reward');
+      const totalRewards = rewardTxs.reduce((s, t) => s + microToDisplay(t.amount), 0);
+      const rewardCost = rewardTxs.reduce((s, t) => s + microToDisplay(t.amount) * t.costPerToken, 0);
+      $('#stat-rewards').textContent = fmt(totalRewards, 2) + ' NTMPI';
+      $('#stat-rewards-sub').textContent = `income basis ${fmtUSD(rewardCost)}`;
     }
-    totalCost -= disposedCost;
-    totalTokens -= disposed;
-  } else {
-    const avg = totalCost / totalTokens;
-    let disp = 0;
-    for (const o of outflows) disp += microToDisplay(o.amount);
-    totalCost -= disp * avg;
-    totalTokens -= disp;
-  }
 
-  const bal = microToDisplay(state.balance);
-  const val = bal * state.currentPrice;
-  const pnl = val - totalCost;
-  const pct = totalCost > 0 ? (pnl / totalCost) * 100 : 0;
-  const avgPer = totalTokens > 0 ? totalCost / totalTokens : 0;
+    /* ── Filter toggles ── */
 
-  $('#stat-basis').textContent = fmtUSD(totalCost);
-  $('#stat-avg-cost').textContent = `avg $${avgPer.toFixed(6)}/NTMPI`;
-  $('#stat-value').textContent = fmtUSD(val);
-  $('#stat-pnl').textContent = (pnl >= 0 ? '+' : '') + fmtUSD(pnl);
-  $('#stat-pnl').className = `stat-value ${pnl >= 0 ? 'gain' : 'loss'}`;
-  $('#stat-pnl-pct').textContent = (pnl >= 0 ? '+' : '') + pct.toFixed(2) + '%';
-}
+    function toggleFilter(chip) {
+      const filter = chip.dataset.filter;
+      chip.classList.toggle('active');
+      if (state.activeFilters.has(filter)) {
+        state.activeFilters.delete(filter);
+      } else {
+        state.activeFilters.add(filter);
+      }
+      renderTable();
+    }
 
-function exportCSV() {
-  if (!state.transfers.length) return;
-  const rows = [['Date','Direction','Amount_NTMPI','Counterparty','Cost_Per_Token_USD','Total_Cost_USD','TxHash']];
-  for (const tx of state.transfers) {
-    const amt = microToDisplay(tx.amount);
-    rows.push([
-      tx.timestamp || '', tx.direction.toUpperCase(), amt.toFixed(6), tx.counterparty,
-      tx.costPerToken ? tx.costPerToken.toFixed(6) : '', 
-      (tx.direction === 'in' && tx.costPerToken > 0) ? (amt * tx.costPerToken).toFixed(2) : '',
-      tx.hash,
-    ]);
-  }
-  const blob = new Blob([rows.map(r => r.join(',')).join('\n')], { type: 'text/csv' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `ntmpi-cost-basis-${state.address.slice(0, 12)}.csv`;
-  a.click();
-}
+    /* ── Table rendering ── */
 
-function clearAll() {
-  state = { address: '', balance: 0n, transfers: [], currentPrice: 0, method: 'fifo' };
-  $('#address-input').value = '';
-  $('#stats-row').classList.add('hidden');
-  $('#transfers-card').classList.add('hidden');
-  $('#live-price').style.display = 'none';
-  hideStatus();
-}
+    const TYPE_LABELS = {
+      in: '<span class="td-in">▼ IN</span>',
+      out: '<span class="td-out">▲ OUT</span>',
+      delegate: '<span class="td-stake">⬆ DELEGATE</span>',
+      undelegate: '<span class="td-stake">⬇ UNDELEGATE</span>',
+      redelegate: '<span class="td-stake">↔ REDELEGATE</span>',
+      reward: '<span class="td-reward">★ REWARD</span>',
+    };
 
-// Init
-(async () => {
-  const price = await fetchCurrentPrice();
-  if (price > 0) {
-    state.currentPrice = price;
-    $('#live-price').style.display = 'flex';
-    $('#price-display').textContent = `$${price.toFixed(6)}`;
-  }
-  const p = new URLSearchParams(window.location.search);
-  const a = p.get('address') || p.get('addr');
-  if (a && a.startsWith('neutaro1')) {
-    $('#address-input').value = a;
-    fetchWallet();
-  }
-})();
-</script>
+    function renderTable() {
+      const tbody = $('#tx-tbody');
+      const sortDir = $('#sort-order').value;
+      let list = state.transfers.filter(t => state.activeFilters.has(t.type));
+
+      if (sortDir === 'desc') list = [...list].reverse();
+
+      if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px;">No transactions found</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = list.map(tx => {
+        const amt = microToDisplay(tx.amount);
+        const dateStr = tx.timestamp
+          ? new Date(tx.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+          : '—';
+
+        const idx = state.transfers.indexOf(tx);
+        const needsPrice = (tx.type === 'in' || tx.type === 'reward');
+
+        const costCell = needsPrice
+          ? `<input type="number" step="0.000001" min="0"
+              class="cost-input ${tx.autoPrice > 0 ? 'auto-filled' : ''}"
+              value="${tx.costPerToken ? tx.costPerToken.toFixed(6) : ''}"
+              placeholder="0.000000" data-idx="${idx}" onchange="updateCost(this)" />`
+          : '<span style="color:var(--text-muted)">—</span>';
+
+        const totalCost = (needsPrice && tx.costPerToken > 0)
+          ? fmtUSD(amt * tx.costPerToken)
+          : '<span style="color:var(--text-muted)">—</span>';
+
+        const counterparty = tx.counterparty || '—';
+
+        return `<tr>
+          <td>${dateStr}</td>
+          <td>${TYPE_LABELS[tx.type] || tx.type}</td>
+          <td style="font-weight:500">${fmt(amt, 2)}</td>
+          <td class="td-addr" title="${counterparty}">${truncAddr(counterparty)}</td>
+          <td>${costCell}</td>
+          <td>${totalCost}</td>
+          <td class="td-hash"><a href="${NEUTARO.explorer}/${tx.hash}" target="_blank">${tx.hash.slice(0,8)}…</a></td>
+        </tr>`;
+      }).join('');
+    }
+
+    function updateCost(input) {
+      const idx = parseInt(input.dataset.idx);
+      state.transfers[idx].costPerToken = parseFloat(input.value) || 0;
+      input.classList.remove('auto-filled');
+      recalculate();
+      renderTable();
+    }
+
+    function setMethod(m) {
+      state.method = m;
+      $$('.method-btn').forEach(b => b.classList.toggle('active', b.dataset.method === m));
+      recalculate();
+    }
+
+    /* ── Cost basis calculation ──
+       Inflows that create cost basis:
+         - 'in' (bank receive) — acquisition at market price
+         - 'reward' (staking reward claim) — income at FMV, becomes cost basis
+       
+       Outflows that dispose tokens:
+         - 'out' (bank send)
+       
+       Staking operations (delegate/undelegate/redelegate):
+         - Do NOT create or dispose cost basis lots
+         - Tokens remain owned, just locked/unlocked
+         - Tax treatment: generally not a taxable event
+    */
+
+    function recalculate() {
+      // Inflows: transfers in + rewards claimed
+      const inflows = state.transfers.filter(t =>
+        (t.type === 'in' || t.type === 'reward') && t.costPerToken > 0
+      );
+      // Outflows: only bank sends out
+      const outflows = state.transfers.filter(t => t.type === 'out');
+
+      if (!inflows.length) {
+        $('#stat-basis').textContent = '—';
+        $('#stat-avg-cost').textContent = 'Enter cost per token';
+        $('#stat-pnl').textContent = '—';
+        $('#stat-pnl').className = 'stat-value';
+        $('#stat-pnl-pct').textContent = '—';
+        return;
+      }
+
+      let totalCost = 0, totalTokens = 0;
+      const lots = inflows.map(t => ({
+        amount: microToDisplay(t.amount),
+        cost: t.costPerToken,
+        remaining: microToDisplay(t.amount),
+        type: t.type,
+      }));
+
+      for (const l of lots) {
+        totalCost += l.amount * l.cost;
+        totalTokens += l.amount;
+      }
+
+      if (state.method === 'fifo' || state.method === 'lifo') {
+        const ordered = state.method === 'lifo' ? [...lots].reverse() : lots;
+        let disposed = 0, disposedCost = 0;
+        for (const out of outflows) {
+          let rem = microToDisplay(out.amount);
+          for (const l of ordered) {
+            if (rem <= 0) break;
+            const take = Math.min(l.remaining, rem);
+            disposedCost += take * l.cost;
+            l.remaining -= take;
+            rem -= take;
+            disposed += take;
+          }
+        }
+        totalCost -= disposedCost;
+        totalTokens -= disposed;
+      } else {
+        // Average cost
+        const avg = totalCost / totalTokens;
+        let disp = 0;
+        for (const o of outflows) disp += microToDisplay(o.amount);
+        totalCost -= disp * avg;
+        totalTokens -= disp;
+      }
+
+      // Total value = (available balance + staked) × current price
+      const totalHeld = microToDisplay(state.balance) + microToDisplay(state.staked);
+      const val = totalHeld * state.currentPrice;
+      const pnl = val - totalCost;
+      const pct = totalCost > 0 ? (pnl / totalCost) * 100 : 0;
+      const avgPer = totalTokens > 0 ? totalCost / totalTokens : 0;
+
+      $('#stat-basis').textContent = fmtUSD(totalCost);
+      $('#stat-avg-cost').textContent = `avg $${avgPer.toFixed(6)}/NTMPI`;
+      $('#stat-value').textContent = fmtUSD(val);
+
+      $('#stat-pnl').textContent = (pnl >= 0 ? '+' : '') + fmtUSD(pnl);
+      $('#stat-pnl').className = `stat-value ${pnl >= 0 ? 'gain' : 'loss'}`;
+      $('#stat-pnl-pct').textContent = (pnl >= 0 ? '+' : '') + pct.toFixed(2) + '%';
+    }
+
+    /* ── CSV Export ── */
+
+    function exportCSV() {
+      if (!state.transfers.length) return;
+      const rows = [['Date','Type','Amount_NTMPI','Counterparty','Cost_Per_Token_USD','Total_Cost_USD','TxHash']];
+      for (const tx of state.transfers) {
+        const amt = microToDisplay(tx.amount);
+        const needsPrice = (tx.type === 'in' || tx.type === 'reward');
+        rows.push([
+          tx.timestamp || '',
+          tx.type.toUpperCase(),
+          amt.toFixed(6),
+          tx.counterparty,
+          (needsPrice && tx.costPerToken) ? tx.costPerToken.toFixed(6) : '',
+          (needsPrice && tx.costPerToken > 0) ? (amt * tx.costPerToken).toFixed(2) : '',
+          tx.hash,
+        ]);
+      }
+      const blob = new Blob([rows.map(r => r.join(',')).join('\n')], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `ntmpi-cost-basis-${state.address.slice(0, 12)}.csv`;
+      a.click();
+    }
+
+    function clearAll() {
+      state = { address: '', balance: 0n, staked: 0n, transfers: [], currentPrice: 0, method: 'fifo', activeFilters: new Set(['in','out','delegate','undelegate','redelegate','reward']) };
+      $('#address-input').value = '';
+      $('#stats-row').classList.add('hidden');
+      $('#transfers-card').classList.add('hidden');
+      $('#live-price').style.display = 'none';
+      // Reset filter chips
+      $$('.toggle-chip').forEach(c => c.classList.add('active'));
+      hideStatus();
+    }
+
+    /* ── Init ── */
+    (async () => {
+      const price = await fetchCurrentPrice();
+      if (price > 0) {
+        state.currentPrice = price;
+        $('#live-price').style.display = 'flex';
+        $('#price-display').textContent = `$${price.toFixed(6)}`;
+      }
+      const p = new URLSearchParams(window.location.search);
+      const a = p.get('address') || p.get('addr');
+      if (a && a.startsWith('neutaro1')) {
+        $('#address-input').value = a;
+        fetchWallet();
+      }
+    })();
+  </script>
 </body>
 </html>
