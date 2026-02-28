@@ -1,10 +1,131 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Basis Timpi — NTMPI Cost Basis Calculator</title>
-  <meta name="description" content="Calculate the USD cost basis for your NTMPI holdings on the Neutaro blockchain. Tracks transfers, staking delegations, rewards, and computes unrealized gains." />
+  <title>Basis Timpi — NTMPI Cost Basis Calculator | Neutaro Tax Tool</title>
+  <meta name="description" content="Free open-source NTMPI cost basis calculator for the Neutaro blockchain. Track node rewards, staking APY, delegations, and transfers — auto-fetch pricing, generate IRS Form 8949, and compute FIFO/LIFO/HIFO capital gains. Part of the ClawPurse ecosystem." />
+  <meta name="keywords" content="NTMPI cost basis, Neutaro tax calculator, crypto tax tool, NTMPI tax, staking rewards tax, node rewards income, IRS Form 8949, crypto capital gains, FIFO LIFO HIFO, Timpi node rewards, blockchain tax reporting, ClawPurse, cryptocurrency cost basis tracker, DePIN tax, Neutaro wallet" />
+  <meta name="robots" content="index, follow" />
+  <meta name="author" content="Mhue" />
+  <meta name="generator" content="ClawPurse" />
+  <link rel="canonical" href="https://basis.clawpurse.ai/" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Basis Timpi — Free NTMPI Cost Basis Calculator" />
+  <meta property="og:description" content="Open-source tax tool for NTMPI on Neutaro. Track node rewards, staking APY, and transfers. Generate Form 8949 with FIFO/LIFO/HIFO cost basis methods." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://basis.clawpurse.ai/" />
+  <meta property="og:site_name" content="Basis Timpi" />
+  <meta property="og:locale" content="en_US" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Basis Timpi — NTMPI Cost Basis Calculator" />
+  <meta name="twitter:description" content="Free open-source tax tool for Neutaro. Node rewards, staking APY, Form 8949, and FIFO/LIFO/HIFO capital gains — all in one page." />
+
+  <!-- Structured Data: WebApplication -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Basis Timpi",
+    "alternateName": "NTMPI Cost Basis Calculator",
+    "url": "https://basis.clawpurse.ai/",
+    "description": "Free open-source cost basis calculator for NTMPI on the Neutaro blockchain. Tracks node rewards, staking delegations, transfers, and generates IRS Form 8949 with multiple cost basis methods.",
+    "applicationCategory": "FinanceApplication",
+    "operatingSystem": "Any (web-based)",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "featureList": [
+      "NTMPI node reward tracking (Synaptron, Guardian, Collector, GeoCore)",
+      "Staking APY income calculation",
+      "FIFO, LIFO, HIFO, and Average Cost basis methods",
+      "IRS Form 8949 generation per tax year",
+      "Self-transfer detection and Address Book",
+      "Auto-fetched historical NTMPI pricing",
+      "CSV export",
+      "Delegation and undelegation tracking",
+      "Node Access NFT display"
+    ],
+    "author": {
+      "@type": "Organization",
+      "name": "Mhue AI",
+      "url": "https://mhue.ai"
+    },
+    "isPartOf": {
+      "@type": "WebSite",
+      "name": "ClawPurse",
+      "url": "https://clawpurse.ai"
+    }
+  }
+  </script>
+
+  <!-- Structured Data: FAQPage -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "How are NTMPI node rewards taxed?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "NTMPI node rewards (Synaptron, Guardian, Collector, GeoCore) are treated as ordinary income at fair market value when received, per IRS Notice 2014-21. Basis Timpi automatically classifies these from on-chain transaction memos."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What cost basis methods does Basis Timpi support?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Basis Timpi supports FIFO (First In First Out, IRS default), LIFO (Last In First Out), HIFO (Highest In First Out, minimizes gains), and Average Cost. Per-wallet tracking is required starting 2025 (Rev. Proc. 2024-28)."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Are transfers between my own wallets taxable?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No. Self-transfers between your own Neutaro wallets are not taxable events. Basis Timpi automatically detects round-trip transfers and provides an Address Book to tag your other wallets, excluding them from Form 8949."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does Basis Timpi require an API key?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No. Basis Timpi fetches all transaction data directly from the public Neutaro REST API. Just enter your wallet address and click Fetch. No account, API key, or signup required."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How is NTMPI staking APY taxed?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Staking rewards are ordinary income at fair market value when received, per IRS Revenue Ruling 2023-14. Basis Timpi tracks delegation rewards separately and includes them in your taxable income calculation."
+        }
+      }
+    ]
+  }
+  </script>
+
+  <!-- Structured Data: BreadcrumbList -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "ClawPurse", "item": "https://clawpurse.ai" },
+      { "@type": "ListItem", "position": 2, "name": "Basis Timpi", "item": "https://basis.clawpurse.ai" }
+    ]
+  }
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet" />
@@ -794,13 +915,21 @@
       <p>
         <strong>Basis Timpi</strong> — Open-source NTMPI cost basis tracker on the
         <a href="https://neutaro.com" target="_blank">Neutaro</a> blockchain.
-        Part of the <a href="https://github.com/mhue-ai/ClawPurse" target="_blank">ClawPurse</a> ecosystem.
+        Part of the <a href="https://clawpurse.ai">ClawPurse</a> micropayment ecosystem.
       </p>
       <p style="margin-top:6px;">
         Live price via <a href="https://www.coingecko.com/en/coins/neutaro" target="_blank">CoinGecko</a>.
         Historical prices from bundled <code>prices.js</code> with CoinGecko API fallback for newer dates.
       </p>
-      <p style="margin-top:8px;font-size:0.65rem;color:var(--text-dim);line-height:1.6;">
+      <nav style="margin-top:10px;font-size:0.72rem;display:flex;flex-wrap:wrap;gap:8px 20px;justify-content:center;" aria-label="Ecosystem links">
+        <a href="https://clawpurse.ai" style="color:var(--text-dim);">ClawPurse Wallet</a>
+        <a href="https://gateway.clawpurse.ai" style="color:var(--text-dim);">402 Gateway</a>
+        <a href="https://drip.clawpurse.ai" style="color:var(--text-dim);">Timpi Drip Faucet</a>
+        <a href="https://explorer.neutaro.io" target="_blank" style="color:var(--text-dim);">Neutaro Explorer</a>
+        <a href="https://timpi.io" target="_blank" style="color:var(--text-dim);">Timpi</a>
+        <a href="https://github.com/mhue-ai/basis-timpi" target="_blank" style="color:var(--text-dim);">Source Code</a>
+      </nav>
+      <p style="margin-top:10px;font-size:0.65rem;color:var(--text-dim);line-height:1.6;">
         <strong>IRS Tax Disclaimer:</strong> This tool is for informational purposes only and is not tax, legal, or financial advice.
         Per IRS guidance, cryptocurrency is treated as property (Notice 2014-21). Staking and node rewards are ordinary income
         at fair market value when received (Rev. Rul. 2023-14). Cost basis must be tracked per-wallet starting 2025 tax year
