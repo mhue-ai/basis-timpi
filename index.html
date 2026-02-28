@@ -944,12 +944,17 @@
     function autoDetectSelfWallets() {
       const book = getAddressBook();
       const outAddrs = new Set();
+      const outMemos = {};
       const inAddrs = new Set();
       const inMemos = {};
       for (const tx of state.transfers) {
         const cp = (tx.counterparty || '').toLowerCase();
         if (!cp || cp === state.address.toLowerCase()) continue;
-        if (tx.type === 'out') outAddrs.add(cp);
+        if (tx.type === 'out') {
+          outAddrs.add(cp);
+          if (!outMemos[cp]) outMemos[cp] = [];
+          if (tx.memo) outMemos[cp].push(tx.memo);
+        }
         if (tx.type === 'in' || tx._originalType === 'in') {
           inAddrs.add(cp);
           if (!inMemos[cp]) inMemos[cp] = [];
@@ -958,11 +963,23 @@
       }
       // Round-trip addresses: sent to AND received from
       const roundTrip = [...outAddrs].filter(a => inAddrs.has(a));
-      // Self-transfer keyword addresses
+      // Self-transfer keyword addresses (incoming OR outgoing memos)
       const SELF_KEYWORDS = ['test out', 'closing out', 'seed'];
-      const keywordMatches = [...inAddrs].filter(a => {
+      const keywordInbound = [...inAddrs].filter(a => {
         const memos = inMemos[a] || [];
         return memos.some(m => SELF_KEYWORDS.some(kw => m.toLowerCase().includes(kw)));
+      });
+      const keywordOutbound = [...outAddrs].filter(a => {
+        const memos = outMemos[a] || [];
+        return memos.some(m => SELF_KEYWORDS.some(kw => m.toLowerCase().includes(kw)));
+      });
+      // Outgoing-only addresses where ALL transfers are small and personal
+      // (sent to but never received from, and every outflow has a gift/personal memo or is under 100 NTMPI)
+      const PERSONAL_KEYWORDS = ['birthday', 'christmas', 'gift', 'faucet', 'drip', 'tip'];
+      const personalOutbound = [...outAddrs].filter(a => {
+        if (inAddrs.has(a)) return false; // already handled by round-trip
+        const memos = outMemos[a] || [];
+        return memos.some(m => PERSONAL_KEYWORDS.some(kw => m.toLowerCase().includes(kw)));
       });
       // Combine and deduplicate, excluding already-tagged addresses and known Timpi addresses
       const KNOWN_TIMPI = new Set([
@@ -971,7 +988,7 @@
         'neutaro1dq5a4x9f8ksp0y062z7v5cn3sa99tgfmjrk92x',
         'neutaro123rsx3yhd8qts0aduw7zacpwtk6m94ucvya354',
       ]);
-      const candidates = [...new Set([...roundTrip, ...keywordMatches])]
+      const candidates = [...new Set([...roundTrip, ...keywordInbound, ...keywordOutbound, ...personalOutbound])]
         .filter(a => !book[a] && !KNOWN_TIMPI.has(a));
       
       if (candidates.length === 0) return;
@@ -982,7 +999,7 @@
       }
       saveAddressBook(book);
       const n = candidates.length;
-      showStatus(`Auto-detected ${n} self-owned wallet${n > 1 ? 's' : ''} (round-trip transfers). Tagged as "Self" in Address Book.`, 'success');
+      showStatus(`Auto-detected ${n} self-owned wallet${n > 1 ? 's' : ''} (transfer pattern analysis). Tagged as "Self" in Address Book.`, 'success');
     }
 
     /* ── UI helpers ── */
