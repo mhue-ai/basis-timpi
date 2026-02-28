@@ -1067,12 +1067,12 @@
                     else if (memoLower.includes('adjustment') || memoLower.includes('synaptron adj')) txType = 'node_adjustment';
                     else txType = 'staking_apy';
                   } else if (sender === TIMPI_OPS) {
-                    // Timpi operational wallet — rewards and bulk payouts
+                    // Timpi operational wallet — node-type memos are rewards, everything else is a purchase/transfer
                     if (memoLower.includes('syn')) txType = 'node_synaptron';
                     else if (memoLower.includes('guardian')) txType = 'node_guardian';
                     else if (memoLower.includes('collector')) txType = 'node_collector';
                     else if (memoLower.includes('geo')) txType = 'node_geocore';
-                    else txType = 'node_unclassified';
+                    else txType = 'timpi_transfer';
                   } else if (sender === CHARITY_VALIDATOR) {
                     txType = 'gift';
                   } else if (memoLower.includes('drip') || memoLower.includes('faucet')) {
