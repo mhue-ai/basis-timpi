@@ -234,7 +234,40 @@
     .method-btn.active { background: var(--coral); color: #0c0e13; }
     .method-btn:not(.active):hover { color: var(--text); }
 
-    .export-bar { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+    .export-bar { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; align-items: center; }
+    .tax-forms-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 28px 24px; margin-top: 24px; text-align: center;
+    }
+    .tax-forms-card h3 { margin: 0 0 4px; font-size: 1.1rem; color: var(--text); }
+    .tax-forms-card .tax-sub { color: var(--text-dim); font-size: 0.82rem; margin-bottom: 20px; }
+    .tax-forms-actions {
+      display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap;
+    }
+    .tax-forms-actions select {
+      background: var(--bg); color: var(--text); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 14px; font-size: 0.85rem; font-family: var(--mono);
+      cursor: pointer;
+    }
+    .tax-forms-actions select:hover { border-color: var(--coral); }
+    .btn-generate {
+      background: var(--coral); color: #fff; border: none; border-radius: 8px;
+      padding: 12px 28px; font-size: 0.95rem; font-weight: 600; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 8px;
+      transition: background 0.2s, transform 0.1s; font-family: inherit;
+    }
+    .btn-generate:hover { background: #e05d44; transform: translateY(-1px); }
+    .btn-generate:active { transform: translateY(0); }
+    .tax-forms-secondary {
+      display: flex; gap: 10px; justify-content: center; margin-top: 16px;
+    }
+    .tax-forms-secondary button {
+      background: transparent; color: var(--text-dim); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 16px; font-size: 0.8rem; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px; font-family: inherit;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .tax-forms-secondary button:hover { border-color: var(--coral); color: var(--coral); }
 
     .toggle-row {
       display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
@@ -711,20 +744,37 @@
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export CSV
         </button>
-        <span style="display:inline-flex;align-items:center;gap:4px;">
-          <select id="tax-year" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:0.72rem;">
-            <option value="2024">TY 2024</option>
-            <option value="2025" selected>TY 2025</option>
-            <option value="2026">TY 2026</option>
-          </select>
-          <button class="btn btn-sm" style="background:var(--coral);color:#fff;border:none;" onclick="generateTaxForms()">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            Generate Tax Forms
-          </button>
-        </span>
         <button class="btn btn-ghost btn-sm" onclick="recalculate()">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
           Recalculate
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="tax-forms-card hidden" id="tax-forms-card">
+      <h3>📄 Generate IRS Tax Forms</h3>
+      <p class="tax-sub">Form 8949 (dispositions &amp; capital gains) + Schedule 1 (ordinary income from staking &amp; node rewards)</p>
+      <div class="tax-forms-actions">
+        <select id="tax-year">
+          <option value="2024">TY 2024</option>
+          <option value="2025" selected>TY 2025</option>
+          <option value="2026">TY 2026</option>
+        </select>
+        <button class="btn-generate" onclick="generateTaxForms()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Generate Tax Forms
+        </button>
+      </div>
+      <div class="tax-forms-secondary">
+        <button onclick="exportCSV()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export CSV
+        </button>
+        <button onclick="recalculate()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+          Recalculate Basis
         </button>
       </div>
     </div>
@@ -1460,6 +1510,7 @@
         $('#stats-row').classList.remove('hidden');
         $('#addr-book').classList.remove('hidden');
         $('#transfers-card').classList.remove('hidden');
+        $('#tax-forms-card').classList.remove('hidden');
 
         // Fetch NFTs
         showStatus('Querying node access NFTs…', 'info');
@@ -2104,6 +2155,7 @@
       $('#stats-row').classList.add('hidden');
       $('#addr-book').classList.add('hidden');
       $('#transfers-card').classList.add('hidden');
+      $('#tax-forms-card').classList.add('hidden');
       $('#nft-card').classList.add('hidden');
       $('#live-price').style.display = 'none';
       // Reset filter chips
