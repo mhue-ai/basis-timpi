@@ -265,7 +265,7 @@
       </button>
       <button class="btn btn-ghost btn-sm" onclick="clearAll()">Clear</button>
       <span style="font-size:0.75rem; color:var(--text-muted); margin-left:auto;">
-        Uses Neutaro REST API &amp; CoinGecko — no API key needed
+        Uses Neutaro REST API — no API key needed
       </span>
     </div>
   </div>
@@ -354,12 +354,14 @@
       Part of the <a href="https://github.com/mhue-ai/ClawPurse" target="_blank">ClawPurse</a> ecosystem.
     </p>
     <p style="margin-top:6px;">
-      Price data via <a href="https://www.coingecko.com/en/coins/neutaro" target="_blank">CoinGecko</a>.
-      Not financial advice. Verify all data independently.
+      Live price via <a href="https://www.coingecko.com/en/coins/neutaro" target="_blank">CoinGecko</a>.
+      Historical prices from bundled <code>prices.js</code> (703 daily entries since 2024-03-28).
+      Not financial advice.
     </p>
   </div>
 </footer>
 
+<script src="prices.js"></script>
 <script>
 const NEUTARO = {
   rest: 'https://api2.neutaro.io',
@@ -375,7 +377,6 @@ let state = {
   balance: 0n,
   transfers: [],
   currentPrice: 0,
-  historicalPrices: {},
   method: 'fifo',
 };
 
@@ -456,7 +457,10 @@ async function fetchTxEvents(address, role) {
   return txs;
 }
 
-// --- CoinGecko ---
+// --- Price Data ---
+// Static historical prices loaded from prices.js (window.NTMPI_PRICES)
+// Current price still fetched live from CoinGecko
+
 async function fetchCurrentPrice() {
   try {
     const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${NEUTARO.coingeckoId}&vs_currencies=usd`);
@@ -465,28 +469,12 @@ async function fetchCurrentPrice() {
   } catch { return 0; }
 }
 
-async function fetchHistoricalPrice(dateStr) {
-  if (state.historicalPrices[dateStr] !== undefined) return state.historicalPrices[dateStr];
-  try {
-    const res = await fetch(`https://api.coingecko.com/api/v3/coins/${NEUTARO.coingeckoId}/history?date=${dateStr}`);
-    const data = await res.json();
-    const price = data.market_data?.current_price?.usd || 0;
-    state.historicalPrices[dateStr] = price;
-    return price;
-  } catch {
-    state.historicalPrices[dateStr] = 0;
-    return 0;
-  }
-}
-
-function isoToCGDate(iso) {
-  if (!iso) return null;
-  const d = new Date(iso);
-  return `${String(d.getUTCDate()).padStart(2,'0')}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${d.getUTCFullYear()}`;
-}
-function isWithin365(iso) {
-  if (!iso) return false;
-  return (Date.now() - new Date(iso).getTime()) < 365 * 864e5;
+function lookupHistoricalPrice(isoTimestamp) {
+  // Look up price from static prices.js data
+  if (!isoTimestamp || !window.NTMPI_PRICES) return 0;
+  const d = new Date(isoTimestamp);
+  const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+  return window.NTMPI_PRICES[key] || 0;
 }
 
 // --- Main fetch ---
@@ -512,19 +500,12 @@ async function fetchWallet() {
     showStatus('Fetching transfer history…', 'info');
     const raw = await fetchTransfers(addr);
 
-    showStatus(`Found ${raw.length} transfers. Fetching historical prices…`, 'info');
+    showStatus(`Found ${raw.length} transfers. Looking up historical prices…`, 'info');
     state.transfers = [];
-    let pc = 0;
     for (const tx of raw) {
-      const cgDate = isoToCGDate(tx.timestamp);
       let autoPrice = 0;
-      if (tx.direction === 'in' && cgDate && isWithin365(tx.timestamp)) {
-        if (pc > 0 && pc % 8 === 0) {
-          showStatus(`Fetching prices… (${pc} done, rate-limit pause)`, 'info');
-          await new Promise(r => setTimeout(r, 2000));
-        }
-        autoPrice = await fetchHistoricalPrice(cgDate);
-        pc++;
+      if (tx.direction === 'in') {
+        autoPrice = lookupHistoricalPrice(tx.timestamp);
       }
       state.transfers.push({
         hash: tx.hash, height: tx.height, timestamp: tx.timestamp,
@@ -671,7 +652,7 @@ function exportCSV() {
 }
 
 function clearAll() {
-  state = { address: '', balance: 0n, transfers: [], currentPrice: 0, historicalPrices: {}, method: 'fifo' };
+  state = { address: '', balance: 0n, transfers: [], currentPrice: 0, method: 'fifo' };
   $('#address-input').value = '';
   $('#stats-row').classList.add('hidden');
   $('#transfers-card').classList.add('hidden');
