@@ -423,15 +423,16 @@ async function fetchTransfers(address) {
 async function fetchTxEvents(address, role) {
   const eventKey = `transfer.${role}`;
   const txs = [];
-  let nextKey = null, page = 0;
+  let page = 1;
   do {
-    let url = `${NEUTARO.rest}/cosmos/tx/v1beta1/txs?events=${encodeURIComponent(`${eventKey}='${address}'`)}&pagination.limit=50&order_by=2`;
-    if (nextKey) url += `&pagination.key=${encodeURIComponent(nextKey)}`;
+    let url = `${NEUTARO.rest}/cosmos/tx/v1beta1/txs?events=${encodeURIComponent(`${eventKey}='${address}'`)}&pagination.limit=100&page=${page}&order_by=2`;
     const res = await fetch(url);
     if (!res.ok) break;
     const data = await res.json();
-    for (let i = 0; i < (data.tx_responses || []).length; i++) {
-      const txRes = data.tx_responses[i];
+    const total = parseInt(data.total || '0');
+    const responses = data.tx_responses || [];
+    for (let i = 0; i < responses.length; i++) {
+      const txRes = responses[i];
       const msgs = data.txs?.[i]?.body?.messages || [];
       for (const msg of msgs) {
         if (msg['@type'] !== '/cosmos.bank.v1beta1.MsgSend') continue;
@@ -450,10 +451,10 @@ async function fetchTxEvents(address, role) {
         }
       }
     }
-    nextKey = data.pagination?.next_key || null;
+    if (page > 1) showStatus(`Fetching ${role} transfers… (page ${page})`, 'info');
+    if (responses.length < 100 || page * 100 >= total) break;
     page++;
-    if (page > 0) showStatus(`Fetching ${role} transfers… (page ${page})`, 'info');
-  } while (nextKey && page < 20);
+  } while (page <= 20);
   return txs;
 }
 
