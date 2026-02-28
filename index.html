@@ -258,6 +258,56 @@
     .chip-dot.purple { background: var(--purple); }
     .chip-dot.yellow { background: var(--yellow); }
 
+    .nft-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px; margin-bottom: 16px;
+    }
+    .nft-item {
+      background: var(--bg-raised); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px; display: flex; gap: 14px;
+      align-items: flex-start; transition: border-color 0.2s;
+    }
+    .nft-item:hover { border-color: var(--coral-dim); }
+    .nft-icon {
+      width: 44px; height: 44px; border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem; flex-shrink: 0;
+    }
+    .nft-icon.collector { background: var(--green-dim); }
+    .nft-icon.guardian { background: var(--cyan-dim); }
+    .nft-icon.synaptron { background: var(--purple-dim); }
+    .nft-icon.geocore { background: var(--coral-dim); }
+    .nft-details { flex: 1; min-width: 0; }
+    .nft-name {
+      font-size: 0.82rem; font-weight: 600; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .nft-type {
+      font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;
+      letter-spacing: 0.04em; font-weight: 500; margin-top: 2px;
+    }
+    .nft-reward {
+      margin-top: 8px; display: flex; gap: 8px; align-items: baseline;
+    }
+    .nft-reward-value {
+      font-family: var(--mono); font-size: 0.85rem; font-weight: 600; color: var(--yellow);
+    }
+    .nft-reward-label {
+      font-size: 0.7rem; color: var(--text-muted);
+    }
+    .nft-reward-usd {
+      font-family: var(--mono); font-size: 0.75rem; color: var(--text-dim);
+    }
+    .nft-summary {
+      display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px;
+      padding: 14px 18px; background: var(--bg-raised);
+      border: 1px solid var(--border); border-radius: var(--radius);
+    }
+    .nft-summary-item { }
+    .nft-summary-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 500; }
+    .nft-summary-value { font-family: var(--mono); font-size: 1rem; font-weight: 600; }
+    .nft-summary-value.yellow { color: var(--yellow); }
+
     footer {
       border-top: 1px solid var(--border); padding: 24px 0;
       margin-top: 40px; text-align: center;
@@ -428,6 +478,38 @@
         </button>
       </div>
     </div>
+
+    <div class="card hidden" id="nft-card">
+      <div class="card-header">
+        <span class="card-title">Node Access NFTs</span>
+        <span style="font-size:0.72rem;color:var(--text-muted);" id="nft-count"></span>
+      </div>
+      <div id="nft-summary" class="nft-summary hidden">
+        <div class="nft-summary-item">
+          <div class="nft-summary-label">Total NFTs</div>
+          <div class="nft-summary-value" id="nft-total-count">0</div>
+        </div>
+        <div class="nft-summary-item">
+          <div class="nft-summary-label">Est. Monthly Output</div>
+          <div class="nft-summary-value yellow" id="nft-total-monthly">0 NTMPI</div>
+        </div>
+        <div class="nft-summary-item">
+          <div class="nft-summary-label">Monthly Value</div>
+          <div class="nft-summary-value" id="nft-total-monthly-usd">$0.00</div>
+        </div>
+        <div class="nft-summary-item">
+          <div class="nft-summary-label">Annual Est.</div>
+          <div class="nft-summary-value yellow" id="nft-total-annual">$0.00</div>
+        </div>
+      </div>
+      <div class="nft-grid" id="nft-grid"></div>
+      <div style="font-size:0.7rem;color:var(--text-muted);line-height:1.5;">
+        Reward amounts are <strong>guaranteed minimum pool contributions per node</strong> shared among all active nodes.
+        Actual rewards depend on node uptime and total active nodes. Data from
+        <a href="https://timpi.gitbook.io/timpis-knowledge-base/timpis-knowledge-base/timpi-nodes/node-reward-structures" target="_blank" style="color:var(--cyan);">Timpi Knowledge Base</a>.
+        Founders Edition nodes may receive a 50% bonus during their boost period.
+      </div>
+    </div>
   </div>
 
   <footer>
@@ -454,13 +536,61 @@
       prefix: 'neutaro',
       explorer: 'https://explorer.neutaro.io/Neutaro/tx',
       coingeckoId: 'neutaro',
+      nftContract: 'neutaro14hj2tavq8fpesdwxxcu44rty3hh90vhujrvcmstl4zr3txmfvw9s9z4e5z',
     };
+
+    /* ── Node NFT reward schedules (guaranteed minimum pool per node/month) ── */
+    const NFT_REWARDS = {
+      'Collector': [
+        { from: '2025-09', to: '2026-08', ntmpi: 250 },
+        { from: '2026-09', to: '2027-08', ntmpi: 210 },
+      ],
+      'Guardian': [
+        { from: '2025-09', to: '2026-08', ntmpi: 500 },
+        { from: '2026-09', to: '2027-08', ntmpi: 375 },
+      ],
+      'Synaptron T1': [
+        { from: '2025-01', to: '2025-12', ntmpi: 1400 },
+        { from: '2026-01', to: '2026-12', ntmpi: 800 },
+        { from: '2027-01', to: '2027-12', ntmpi: 500 },
+      ],
+      'Synaptron T2': [
+        { from: '2025-01', to: '2025-12', ntmpi: 1600 },
+        { from: '2026-01', to: '2026-12', ntmpi: 1000 },
+        { from: '2027-01', to: '2027-12', ntmpi: 700 },
+      ],
+      'GeoCore': [
+        { from: '2025-07', to: '2026-08', ntmpi: 800 },
+        { from: '2026-09', to: '2027-08', ntmpi: 400 },
+        { from: '2027-09', to: '2028-08', ntmpi: 300 },
+      ],
+    };
+
+    function classifyNFT(tokenId) {
+      const id = tokenId.toLowerCase();
+      if (id.startsWith('collector')) return { category: 'Collector', rewardKey: 'Collector', icon: '🔍', css: 'collector' };
+      if (id.startsWith('guardian'))  return { category: 'Guardian',  rewardKey: 'Guardian',  icon: '🛡️', css: 'guardian' };
+      if (id.startsWith('synaptron'))return { category: 'Synaptron', rewardKey: 'Synaptron T1', icon: '🧠', css: 'synaptron' };
+      if (id.startsWith('geocore'))  return { category: 'GeoCore',   rewardKey: 'GeoCore',   icon: '🌐', css: 'geocore' };
+      return { category: 'Unknown', rewardKey: null, icon: '📦', css: 'collector' };
+    }
+
+    function getCurrentMonthlyReward(rewardKey) {
+      if (!rewardKey || !NFT_REWARDS[rewardKey]) return 0;
+      const now = new Date();
+      const ym = `${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,'0')}`;
+      for (const period of NFT_REWARDS[rewardKey]) {
+        if (ym >= period.from && ym <= period.to) return period.ntmpi;
+      }
+      return 0;
+    }
 
     let state = {
       address: '',
       balance: 0n,
       staked: 0n,
-      transfers: [],       // unified list: bank sends, delegations, undelegations, redelegations, rewards
+      transfers: [],
+      nfts: [],
       currentPrice: 0,
       method: 'fifo',
       activeFilters: new Set(['in', 'out', 'delegate', 'undelegate', 'redelegate', 'reward']),
@@ -668,6 +798,75 @@
       return txs;
     }
 
+    /* ── Neutaro REST API — NFT queries (CW721) ── */
+
+    async function fetchNFTs(address) {
+      const nfts = [];
+      let startAfter = null;
+      for (let page = 0; page < 10; page++) {
+        const query = startAfter
+          ? { tokens: { owner: address, limit: 30, start_after: startAfter } }
+          : { tokens: { owner: address, limit: 30 } };
+        const b64 = btoa(JSON.stringify(query));
+        const url = `${NEUTARO.rest}/cosmwasm/wasm/v1/contract/${NEUTARO.nftContract}/smart/${b64}`;
+        try {
+          const res = await fetch(url);
+          if (!res.ok) break;
+          const data = await res.json();
+          const tokens = data?.data?.tokens || [];
+          if (!tokens.length) break;
+          for (const tokenId of tokens) {
+            const info = classifyNFT(tokenId);
+            const monthly = getCurrentMonthlyReward(info.rewardKey);
+            nfts.push({ tokenId, ...info, monthly });
+          }
+          startAfter = tokens[tokens.length - 1];
+          if (tokens.length < 30) break;
+        } catch { break; }
+      }
+      return nfts;
+    }
+
+    function renderNFTs() {
+      const card = $('#nft-card');
+      const grid = $('#nft-grid');
+      const summary = $('#nft-summary');
+
+      if (!state.nfts.length) {
+        card.classList.add('hidden');
+        return;
+      }
+      card.classList.remove('hidden');
+      summary.classList.remove('hidden');
+
+      let totalMonthly = 0;
+      grid.innerHTML = state.nfts.map(nft => {
+        totalMonthly += nft.monthly;
+        const monthlyUSD = nft.monthly * state.currentPrice;
+        return `<div class="nft-item">
+          <div class="nft-icon ${nft.css}">${nft.icon}</div>
+          <div class="nft-details">
+            <div class="nft-name" title="${nft.tokenId}">${nft.tokenId}</div>
+            <div class="nft-type">${nft.category} Node</div>
+            <div class="nft-reward">
+              <span class="nft-reward-value">${nft.monthly > 0 ? fmt(nft.monthly, 0) + ' NTMPI' : 'TBD'}</span>
+              <span class="nft-reward-label">/month</span>
+              ${nft.monthly > 0 ? `<span class="nft-reward-usd">≈ ${fmtUSD(monthlyUSD)}</span>` : ''}
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+
+      const totalMonthlyUSD = totalMonthly * state.currentPrice;
+      const annualUSD = totalMonthlyUSD * 12;
+
+      $('#nft-total-count').textContent = state.nfts.length;
+      $('#nft-total-monthly').textContent = fmt(totalMonthly, 0) + ' NTMPI';
+      $('#nft-total-monthly-usd').textContent = fmtUSD(totalMonthlyUSD);
+      $('#nft-total-annual').textContent = fmtUSD(annualUSD);
+      $('#nft-count').textContent = `${state.nfts.length} found on-chain`;
+    }
+
     /* ── Price Data ── */
 
     async function fetchCurrentPrice() {
@@ -782,7 +981,13 @@
         recalculate();
         $('#stats-row').classList.remove('hidden');
         $('#transfers-card').classList.remove('hidden');
-        showStatus(`Loaded ${state.transfers.length} transactions for ${truncAddr(addr)}`, 'success');
+
+        // Fetch NFTs
+        showStatus('Querying node access NFTs…', 'info');
+        state.nfts = await fetchNFTs(addr);
+        renderNFTs();
+
+        showStatus(`Loaded ${state.transfers.length} transactions${state.nfts.length ? ` and ${state.nfts.length} NFTs` : ''} for ${truncAddr(addr)}`, 'success');
         setTimeout(hideStatus, 3000);
       } catch (err) {
         showStatus(`Error: ${err.message}`, 'error');
@@ -1011,10 +1216,11 @@
     }
 
     function clearAll() {
-      state = { address: '', balance: 0n, staked: 0n, transfers: [], currentPrice: 0, method: 'fifo', activeFilters: new Set(['in','out','delegate','undelegate','redelegate','reward']) };
+      state = { address: '', balance: 0n, staked: 0n, transfers: [], nfts: [], currentPrice: 0, method: 'fifo', activeFilters: new Set(['in','out','delegate','undelegate','redelegate','reward']) };
       $('#address-input').value = '';
       $('#stats-row').classList.add('hidden');
       $('#transfers-card').classList.add('hidden');
+      $('#nft-card').classList.add('hidden');
       $('#live-price').style.display = 'none';
       // Reset filter chips
       $$('.toggle-chip').forEach(c => c.classList.add('active'));
