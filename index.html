@@ -435,9 +435,11 @@
       <div class="nft-grid" id="nft-grid"></div>
       <div style="font-size:0.7rem;color:var(--text-muted);line-height:1.5;">
         Reward amounts are <strong>guaranteed minimum pool contributions per node</strong> shared among all active nodes.
-        Actual rewards depend on node uptime and total active nodes. Data from
+        Actual rewards depend on node uptime and total active nodes.
+        Founders Edition nodes receive a <strong style="color:var(--yellow);">50% reward boost</strong> (already applied above).
+        Data from
+        <a href="https://github.com/Timpi-official/Nodes" target="_blank" style="color:var(--cyan);">Timpi Official Nodes Repo</a> &amp;
         <a href="https://timpi.gitbook.io/timpis-knowledge-base/timpis-knowledge-base/timpi-nodes/node-reward-structures" target="_blank" style="color:var(--cyan);">Timpi Knowledge Base</a>.
-        Founders Edition nodes may receive a 50% bonus during their boost period.
       </div>
     </div>
 
@@ -540,39 +542,78 @@
     };
 
     /* ── Node NFT reward schedules (guaranteed minimum pool per node/month) ── */
+    /* Regular = base rates from Timpi official repo                          */
+    /* Founders Edition = base × 1.5 during boost period, then base after    */
+    /* Source: https://github.com/Timpi-official/Nodes                        */
     const NFT_REWARDS = {
+      /* ── Collectors ── */
       'Collector': [
+        { from: '2024-01', to: '2025-08', ntmpi: 375 },
         { from: '2025-09', to: '2026-08', ntmpi: 250 },
         { from: '2026-09', to: '2027-08', ntmpi: 210 },
       ],
+      'Collector FE': [
+        { from: '2024-01', to: '2025-08', ntmpi: 563 },
+        { from: '2025-09', to: '2026-08', ntmpi: 375 },
+        { from: '2026-09', to: '2027-08', ntmpi: 315 },
+      ],
+      /* ── Guardians ── */
       'Guardian': [
+        { from: '2024-01', to: '2025-08', ntmpi: 667 },
         { from: '2025-09', to: '2026-08', ntmpi: 500 },
         { from: '2026-09', to: '2027-08', ntmpi: 375 },
       ],
+      'Guardian FE': [
+        { from: '2024-01', to: '2025-08', ntmpi: 1000 },
+        { from: '2025-09', to: '2026-08', ntmpi: 750 },
+        { from: '2026-09', to: '2027-08', ntmpi: 563 },
+      ],
+      /* ── Synaptrons (Tier 1: 4-6GB VRAM) ── */
       'Synaptron T1': [
         { from: '2025-01', to: '2025-12', ntmpi: 1400 },
         { from: '2026-01', to: '2026-12', ntmpi: 800 },
         { from: '2027-01', to: '2027-12', ntmpi: 500 },
       ],
+      'Synaptron T1 FE': [
+        { from: '2025-01', to: '2025-12', ntmpi: 2100 },
+        { from: '2026-01', to: '2026-12', ntmpi: 1200 },
+        { from: '2027-01', to: '2027-12', ntmpi: 750 },
+      ],
+      /* ── Synaptrons (Tier 2: 8-16GB VRAM) ── */
       'Synaptron T2': [
         { from: '2025-01', to: '2025-12', ntmpi: 1600 },
         { from: '2026-01', to: '2026-12', ntmpi: 1000 },
         { from: '2027-01', to: '2027-12', ntmpi: 700 },
       ],
+      'Synaptron T2 FE': [
+        { from: '2025-01', to: '2025-12', ntmpi: 2400 },
+        { from: '2026-01', to: '2026-12', ntmpi: 1500 },
+        { from: '2027-01', to: '2027-12', ntmpi: 1050 },
+      ],
+      /* ── GeoCores ── */
       'GeoCore': [
         { from: '2025-07', to: '2026-08', ntmpi: 800 },
         { from: '2026-09', to: '2027-08', ntmpi: 400 },
         { from: '2027-09', to: '2028-08', ntmpi: 300 },
       ],
+      'GeoCore FE': [
+        { from: '2025-07', to: '2026-08', ntmpi: 1200 },
+        { from: '2026-09', to: '2027-08', ntmpi: 600 },
+        { from: '2027-09', to: '2028-08', ntmpi: 450 },
+      ],
     };
 
     function classifyNFT(tokenId) {
       const id = tokenId.toLowerCase();
-      if (id.startsWith('collector')) return { category: 'Collector', rewardKey: 'Collector', icon: '🔍', css: 'collector' };
-      if (id.startsWith('guardian'))  return { category: 'Guardian',  rewardKey: 'Guardian',  icon: '🛡️', css: 'guardian' };
-      if (id.startsWith('synaptron'))return { category: 'Synaptron', rewardKey: 'Synaptron T1', icon: '🧠', css: 'synaptron' };
-      if (id.startsWith('geocore'))  return { category: 'GeoCore',   rewardKey: 'GeoCore',   icon: '🌐', css: 'geocore' };
-      return { category: 'Unknown', rewardKey: null, icon: '📦', css: 'collector' };
+      const isFE = id.includes('founders edition') || id.includes('founders_edition') || id.includes('fe ');
+      const suffix = isFE ? ' FE' : '';
+      const edition = isFE ? 'Founders Edition' : 'Regular';
+
+      if (id.startsWith('collector')) return { category: 'Collector', edition, rewardKey: 'Collector' + suffix, icon: '🔍', css: 'collector' };
+      if (id.startsWith('guardian'))  return { category: 'Guardian',  edition, rewardKey: 'Guardian' + suffix,  icon: '🛡️', css: 'guardian' };
+      if (id.startsWith('synaptron'))return { category: 'Synaptron', edition, rewardKey: 'Synaptron T1' + suffix, icon: '🧠', css: 'synaptron' };
+      if (id.startsWith('geocore'))  return { category: 'GeoCore',   edition, rewardKey: 'GeoCore' + suffix,   icon: '🌐', css: 'geocore' };
+      return { category: 'Unknown', edition: 'Unknown', rewardKey: null, icon: '📦', css: 'collector' };
     }
 
     function getCurrentMonthlyReward(rewardKey) {
@@ -847,7 +888,7 @@
           <div class="nft-icon ${nft.css}">${nft.icon}</div>
           <div class="nft-details">
             <div class="nft-name" title="${nft.tokenId}">${nft.tokenId}</div>
-            <div class="nft-type">${nft.category} Node</div>
+            <div class="nft-type">${nft.category} Node${nft.edition === 'Founders Edition' ? ' <span style="color:var(--yellow);font-size:0.6rem;font-weight:700;">★ FOUNDERS</span>' : ''}</div>
             <div class="nft-reward">
               <span class="nft-reward-value">${nft.monthly > 0 ? fmt(nft.monthly, 0) + ' NTMPI' : 'TBD'}</span>
               <span class="nft-reward-label">/month</span>
