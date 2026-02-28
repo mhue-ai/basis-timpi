@@ -873,6 +873,16 @@
     const $ = s => document.querySelector(s);
     const $$ = s => document.querySelectorAll(s);
 
+    /* ── Canonical type sets (single source of truth) ── */
+    const INFLOW_TYPES = new Set(['in', 'reward', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_unclassified', 'node_adjustment', 'staking_apy', 'lootbox', 'timpi_transfer', 'gift', 'drip', 'self_transfer_in']);
+    const INCOME_TYPES = new Set(['reward', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_unclassified', 'node_adjustment', 'staking_apy', 'lootbox']);
+    const KNOWN_TIMPI = new Set([
+      'neutaro1q68nu5lwczjepjtt6v7fek8vu2m7jxnaukrpdu',
+      'neutaro1n0uc8wwaxez3xzw8722kh2c9kuvqxtamgja4rg',
+      'neutaro1dq5a4x9f8ksp0y062z7v5cn3sa99tgfmjrk92x',
+      'neutaro123rsx3yhd8qts0aduw7zacpwtk6m94ucvya354',
+    ]);
+
     /* ── Address Book (persisted in localStorage) ── */
     /* Supports: self (own wallets), exchange, gift recipient, other */
     /* Self-tagged addresses change tax treatment:
@@ -942,12 +952,6 @@
       if (!warn || !state.transfers.length) { if (warn) warn.style.display = 'none'; return; }
       const book = getAddressBook();
       // Find outgoing transfers to untagged, non-Timpi addresses
-      const KNOWN_TIMPI = new Set([
-        'neutaro1q68nu5lwczjepjtt6v7fek8vu2m7jxnaukrpdu',
-        'neutaro1n0uc8wwaxez3xzw8722kh2c9kuvqxtamgja4rg',
-        'neutaro1dq5a4x9f8ksp0y062z7v5cn3sa99tgfmjrk92x',
-        'neutaro123rsx3yhd8qts0aduw7zacpwtk6m94ucvya354',
-      ]);
       const untagged = state.transfers.filter(tx => {
         if (tx.type !== 'out') return false;
         const cp = (tx.counterparty || '').toLowerCase();
@@ -1007,12 +1011,6 @@
         if (tx.type === 'in' || tx._originalType === 'in') inAddrs.add(cp);
       }
       // Round-trip addresses: sent to AND received from — strong self-wallet signal
-      const KNOWN_TIMPI = new Set([
-        'neutaro1q68nu5lwczjepjtt6v7fek8vu2m7jxnaukrpdu',
-        'neutaro1n0uc8wwaxez3xzw8722kh2c9kuvqxtamgja4rg',
-        'neutaro1dq5a4x9f8ksp0y062z7v5cn3sa99tgfmjrk92x',
-        'neutaro123rsx3yhd8qts0aduw7zacpwtk6m94ucvya354',
-      ]);
       const candidates = [...outAddrs].filter(a => inAddrs.has(a))
         .filter(a => !book[a] && !KNOWN_TIMPI.has(a));
       
@@ -1405,13 +1403,12 @@
         state.transfers = [];
         const needAPI = [];
 
-        const INFLOW_TYPES_SET = new Set(['in', 'reward', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_unclassified', 'node_adjustment', 'staking_apy', 'lootbox', 'timpi_transfer', 'gift', 'drip', 'self_transfer_in']);
 
         for (let idx = 0; idx < raw.length; idx++) {
           const tx = raw[idx];
           let autoPrice = 0;
           // Cost basis applies to all inflow types
-          const needsPrice = INFLOW_TYPES_SET.has(tx.type);
+          const needsPrice = INFLOW_TYPES.has(tx.type);
           if (needsPrice) {
             autoPrice = lookupHistoricalPrice(tx.timestamp);
           }
@@ -1495,7 +1492,6 @@
 
       // Taxable income: all rewards (staking, node, APY, lootbox) per IRS Rev. Rul. 2023-14
       // Staking/node rewards are ordinary income at FMV when received (dominion & control)
-      const INCOME_TYPES = new Set(['reward', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_unclassified', 'node_adjustment', 'staking_apy', 'lootbox']);
       const incomeTxs = state.transfers.filter(t => INCOME_TYPES.has(t.type));
       const totalRewards = incomeTxs.reduce((s, t) => s + microToDisplay(t.amount), 0);
       const rewardCost = incomeTxs.reduce((s, t) => s + microToDisplay(t.amount) * t.costPerToken, 0);
@@ -1574,7 +1570,7 @@
           : '—';
 
         const idx = state.transfers.indexOf(tx);
-        const isInflow = ['in', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_unclassified', 'node_adjustment', 'staking_apy', 'lootbox', 'timpi_transfer', 'gift', 'drip', 'reward', 'self_transfer_in'].includes(tx.type);
+        const isInflow = INFLOW_TYPES.has(tx.type);
 
         const costCell = isInflow
           ? `<input type="number" step="0.000001" min="0"
@@ -1651,9 +1647,8 @@
 
     function recalculate() {
       // Inflows: transfers in + rewards claimed + node rewards + staking APY + lootbox + self-transfers in (carryover basis)
-      const INFLOW_TYPES = ['in', 'reward', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_unclassified', 'node_adjustment', 'staking_apy', 'lootbox', 'timpi_transfer', 'gift', 'drip', 'self_transfer_in'];
       const inflows = state.transfers.filter(t =>
-        INFLOW_TYPES.includes(t.type) && t.costPerToken > 0
+        INFLOW_TYPES.has(t.type) && t.costPerToken > 0
       );
       // Outflows: only actual dispositions — self_transfer_out is non-taxable
       const outflows = state.transfers.filter(t => t.type === 'out');
@@ -1733,12 +1728,10 @@
 
     function exportCSV() {
       if (!state.transfers.length) return;
-      const INFLOW_TYPES = ['in', 'reward', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_unclassified', 'node_adjustment', 'staking_apy', 'lootbox', 'timpi_transfer', 'gift', 'drip', 'self_transfer_in'];
-      const INCOME_TYPES = new Set(['reward', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_unclassified', 'node_adjustment', 'staking_apy', 'lootbox']);
       const rows = [['Date','Type','Tax_Category','Amount_NTMPI','Counterparty','Memo','FMV_Per_Token_USD','Total_FMV_USD','TxHash']];
       for (const tx of state.transfers) {
         const amt = microToDisplay(tx.amount);
-        const isInflow = INFLOW_TYPES.includes(tx.type);
+        const isInflow = INFLOW_TYPES.has(tx.type);
         const memo = (tx.memo || '').replace(/"/g, '""');
         // IRS tax category: Ordinary Income, Capital (acquisition), Disposition, Staking Op, Self-Transfer
         let taxCat = '';
@@ -1780,8 +1773,6 @@
       const yearStart = new Date(`${year}-01-01T00:00:00Z`);
       const yearEnd = new Date(`${year + 1}-01-01T00:00:00Z`);
 
-      const INFLOW_TYPES = new Set(['in', 'reward', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_unclassified', 'node_adjustment', 'staking_apy', 'lootbox', 'timpi_transfer', 'gift', 'drip', 'self_transfer_in']);
-      const INCOME_TYPES = new Set(['reward', 'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_unclassified', 'node_adjustment', 'staking_apy', 'lootbox']);
 
       // All transfers sorted chronologically
       const sorted = [...state.transfers].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
@@ -2103,7 +2094,10 @@
     }
 
     function clearAll() {
-      state = { address: '', balance: 0n, staked: 0n, transfers: [], nfts: [], currentPrice: 0, method: 'fifo', activeFilters: new Set(['in','out','delegate','undelegate','redelegate','reward','node_synaptron','node_guardian','node_collector','node_geocore','node_reward','node_unclassified','node_adjustment','staking_apy','lootbox','timpi_transfer','gift','drip']) };
+      state = { address: '', balance: 0n, staked: 0n, transfers: [], nfts: [], currentPrice: 0, method: 'fifo',
+        activeFilters: new Set(['in', 'out', 'self_transfer_in', 'self_transfer_out', 'delegate', 'undelegate', 'redelegate', 'reward',
+          'node_synaptron', 'node_guardian', 'node_collector', 'node_geocore', 'node_reward', 'node_unclassified', 'node_adjustment',
+          'staking_apy', 'lootbox', 'timpi_transfer', 'gift', 'drip']) };
       $('#address-input').value = '';
       $('#stats-row').classList.add('hidden');
       $('#addr-book').classList.add('hidden');
