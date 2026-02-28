@@ -868,7 +868,8 @@
                   const memoLower = memo.toLowerCase();
                   if (sender === TIMPI_NODE_PAYER) {
                     // Primary node reward payout wallet — classify by memo
-                    if (memoLower.includes('synap')) txType = 'node_synaptron';
+                    // Note: Timpi uses various abbreviations: 'Synap', 'Syn', 'Synaptron'
+                    if (memoLower.includes('syn')) txType = 'node_synaptron';
                     else if (memoLower.includes('guardian')) txType = 'node_guardian';
                     else if (memoLower.includes('collector')) txType = 'node_collector';
                     else if (memoLower.includes('geo')) txType = 'node_geocore';
@@ -882,7 +883,7 @@
                     else txType = 'staking_apy';
                   } else if (sender === TIMPI_OPS) {
                     // Timpi operational wallet — bulk transfers, node top-ups
-                    if (memoLower.includes('synap')) txType = 'node_synaptron';
+                    if (memoLower.includes('syn')) txType = 'node_synaptron';
                     else if (memoLower.includes('guardian')) txType = 'node_guardian';
                     else if (memoLower.includes('collector')) txType = 'node_collector';
                     else if (memoLower.includes('geo')) txType = 'node_geocore';
